@@ -139,6 +139,23 @@ def check_gpu(use_gpu):
     except Exception as e:
         pass
 
+def count_param(model,name = 'Total_params'):
+    # 定义总参数量、可训练参数量及非可训练参数量变量
+    Total_params = 0
+    Trainable_params = 0
+    NonTrainable_params = 0
+
+    # 获取参数情况
+    for p in model.parameters():
+        mulValue = np.prod(p.shape)  # 使用numpy prod接口计算数组所有元素之积
+        Total_params += mulValue  # 总参数量
+        if p.stop_gradient:
+            NonTrainable_params += mulValue  # 可训练参数量
+        else:
+            Trainable_params += mulValue  # 非可训练参数量
+
+    str_name = '{}:{}M'.format(name,Total_params/1000000)
+    return str_name
 
 def train(config,
           train_dataloader,
@@ -173,6 +190,17 @@ def train(config,
         logger.info(
             "During the training process, after the {}th iteration, an evaluation is run every {} iterations".
             format(start_eval_step, eval_batch_step))
+
+    total_param = count_param(model,name = 'total')
+    backbone_param = count_param(model.backbone,name = 'backbone')
+    head_param = count_param(model.head,name = 'head')
+    neck_param = count_param(model.neck, name = 'neck')
+
+    logger.info(total_param)
+    logger.info(backbone_param)
+    logger.info(head_param)
+    logger.info(neck_param)
+
     save_epoch_step = config['Global']['save_epoch_step']
     save_model_dir = config['Global']['save_model_dir']
     if not os.path.exists(save_model_dir):
@@ -197,6 +225,9 @@ def train(config,
         train_batch_cost = 0.0
         train_reader_cost = 0.0
         batch_sum = 0
+        total_time = 0.
+        count = 0
+        max_iter = len(train_dataloader)
         batch_start = time.time()
         for idx, batch in enumerate(train_dataloader):
             train_reader_cost += time.time() - batch_start
@@ -217,6 +248,12 @@ def train(config,
             optimizer.clear_grad()
 
             train_batch_cost += time.time() - batch_start
+            total_time += train_batch_cost
+            count += 1
+            avg_time = total_time / count
+            eta_seconds = avg_time * (max_iter - idx)
+            eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+
             batch_sum += len(images)
 
             if not isinstance(lr_scheduler, float):
@@ -243,8 +280,8 @@ def train(config,
                 (global_step > 0 and global_step % print_batch_step == 0) or
                 (idx >= len(train_dataloader) - 1)):
                 logs = train_stats.log()
-                strs = 'epoch: [{}/{}], iter: {}, {}, reader_cost: {:.5f} s, batch_cost: {:.5f} s, samples: {}, ips: {:.5f}'.format(
-                    epoch, epoch_num, global_step, logs, train_reader_cost /
+                strs = 'epoch: [{}/{}], iter: {}, {},eta times: {}, reader_cost: {:.5f} s, batch_cost: {:.5f} s, samples: {}, ips: {:.5f}'.format(
+                    epoch, epoch_num, global_step, logs, eta_string,train_reader_cost /
                     print_batch_step, train_batch_cost / print_batch_step,
                     batch_sum, batch_sum / train_batch_cost)
                 logger.info(strs)
