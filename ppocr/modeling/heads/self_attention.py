@@ -437,3 +437,4 @@ class MixerBlock(nn.Layer):
         out = self.fc2(hidden)
         out = paddle.transpose(out, perm=[0, 2, 1])
         return out
+
