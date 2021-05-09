@@ -126,7 +126,7 @@ class Encoder(nn.Layer):
                  postprocess_cmd="da"):
 
         super(Encoder, self).__init__()
-        atten_method ='Mixer'
+        atten_method ='MHA'
         self.encoder_layers = list()
         for i in range(n_layer):
             self.encoder_layers.append(

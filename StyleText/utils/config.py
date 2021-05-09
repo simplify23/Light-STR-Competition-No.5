@@ -194,7 +194,7 @@ def gen_config():
             "batch_size_per_card": 8,
             "num_workers_per_card": 4,
             "dataset": {
-                "delimiter": " ", #\t
+                "delimiter": "\t", #\t
                 "data_dir": "/",
                 "label_file": "tmp/label.txt",
                 "transforms": [{
