@@ -3,7 +3,7 @@
 After testing, paddleocr can run on glibc 2.23. You can also test other glibc versions or install glic 2.23 for the best compatibility.
 
 PaddleOCR working environment:
-- PaddlePaddle 2.0.0
+- PaddlePaddle1.8+, Recommend PaddlePaddle 2.0.0.beta
 - python3.7
 - glibc 2.23
 
@@ -11,21 +11,23 @@ It is recommended to use the docker provided by us to run PaddleOCR, please refe
 
 *If you want to directly run the prediction code on mac or windows, you can start from step 2.*
 
-**1. (Recommended) Prepare a docker environment. The first time you use this docker image, it will be downloaded automatically. Please be patient.**
+**1. (Recommended) Prepare a docker environment. The first time you use this image, it will be downloaded automatically. Please be patient.**
 ```
 # Switch to the working directory
 cd /home/Projects
 # You need to create a docker container for the first run, and do not need to run the current command when you run it again
 # Create a docker container named ppocr and map the current directory to the /paddle directory of the container
 
-#If using CPU, use docker instead of nvidia-docker to create docker
-sudo docker run --name ppocr -v $PWD:/paddle --network=host -it  paddlepaddle/paddle:latest-dev-cuda10.1-cudnn7-gcc82  /bin/bash
+# If using CPU, use docker instead of nvidia-docker to create docker
+sudo docker run --name ppocr -v $PWD:/paddle --network=host -it hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda9.0-cudnn7-dev /bin/bash
 ```
-
-If using CUDA10, please run the following command to create a container.
-It is recommended to set a shared memory greater than or equal to 32G through the --shm-size parameter:
+If using CUDA9, please run the following command to create a container:
 ```
-sudo nvidia-docker run --name ppocr -v $PWD:/paddle --shm-size=64G --network=host -it paddlepaddle/paddle:latest-dev-cuda10.1-cudnn7-gcc82 /bin/bash
+sudo nvidia-docker run --name ppocr -v $PWD:/paddle --network=host -it hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda9.0-cudnn7-dev /bin/bash
+```
+If using CUDA10, please run the following command to create a container:
+```
+sudo nvidia-docker run --name ppocr -v $PWD:/paddle --network=host -it hub.baidubce.com/paddlepaddle/paddle:latest-gpu-cuda10.0-cudnn7-dev /bin/bash
 ```
 You can also visit [DockerHub](https://hub.docker.com/r/paddlepaddle/paddle/tags/) to get the image that fits your machine.
 ```
@@ -33,15 +35,29 @@ You can also visit [DockerHub](https://hub.docker.com/r/paddlepaddle/paddle/tags
 sudo docker container exec -it ppocr /bin/bash
 ```
 
-**2. Install PaddlePaddle 2.0**
+Note: If the docker pull is too slow, you can download and load the docker image manually according to the following steps. Take cuda9 docker for example, you only need to change cuda9 to cuda10 to use cuda10 docker:
 ```
-pip3 install --upgrade pip
+# Download the CUDA9 docker compressed file and unzip it
+wget https://paddleocr.bj.bcebos.com/docker/docker_pdocr_cuda9.tar.gz
+# To reduce download time, the uploaded docker image is compressed and needs to be decompressed
+tar zxf docker_pdocr_cuda9.tar.gz
+# Create image
+docker load < docker_pdocr_cuda9.tar
+# After completing the above steps, check whether the downloaded image is loaded through docker images
+docker images
+# If you have the following output after executing docker images, you can follow step 1 to create a docker environment.
+hub.baidubce.com/paddlepaddle/paddle   latest-gpu-cuda9.0-cudnn7-dev    f56310dcc829
+```
+
+**2. Install PaddlePaddle v2.0**
+```
+python3 -m pip install --upgrade pip
 
 # If you have cuda9 or cuda10 installed on your machine, please run the following command to install
-python3 -m pip install paddlepaddle-gpu==2.0.0 -i https://mirror.baidu.com/pypi/simple
+python3 -m pip install paddlepaddle-gpu==2.0.0b0 -i https://mirror.baidu.com/pypi/simple
 
 # If you only have cpu on your machine, please run the following command to install
-python3 -m pip install paddlepaddle==2.0.0 -i https://mirror.baidu.com/pypi/simple
+python3 -m pip install paddlepaddle==2.0.0b0 -i https://mirror.baidu.com/pypi/simple
 ```
 For more software version requirements, please refer to the instructions in [Installation Document](https://www.paddlepaddle.org.cn/install/quick) for operation.
 
@@ -61,7 +77,7 @@ git clone https://gitee.com/paddlepaddle/PaddleOCR
 **4. Install third-party libraries**
 ```
 cd PaddleOCR
-pip3 install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 If you getting this error `OSError: [WinError 126] The specified module could not be found` when you install shapely on windows.

@@ -60,8 +60,7 @@ void Normalize::Run(cv::Mat *im, const std::vector<float> &mean,
 }
 
 void ResizeImgType0::Run(const cv::Mat &img, cv::Mat &resize_img,
-                         int max_size_len, float &ratio_h, float &ratio_w,
-                         bool use_tensorrt) {
+                         int max_size_len, float &ratio_h, float &ratio_w) {
   int w = img.cols;
   int h = img.rows;
 
@@ -77,28 +76,36 @@ void ResizeImgType0::Run(const cv::Mat &img, cv::Mat &resize_img,
 
   int resize_h = int(float(h) * ratio);
   int resize_w = int(float(w) * ratio);
+  if (resize_h % 32 == 0)
+    resize_h = resize_h;
+  else if (resize_h / 32 < 1 + 1e-5)
+    resize_h = 32;
+  else
+    resize_h = resize_h / 32 * 32;
 
-  resize_h = max(int(round(float(resize_h) / 32) * 32), 32);
-  resize_w = max(int(round(float(resize_w) / 32) * 32), 32);
+  if (resize_w % 32 == 0)
+    resize_w = resize_w;
+  else if (resize_w / 32 < 1 + 1e-5)
+    resize_w = 32;
+  else
+    resize_w = resize_w / 32 * 32;
 
-  if (!use_tensorrt) {
-    cv::resize(img, resize_img, cv::Size(resize_w, resize_h));
-    ratio_h = float(resize_h) / float(h);
-    ratio_w = float(resize_w) / float(w);
-  } else {
-    cv::resize(img, resize_img, cv::Size(640, 640));
-    ratio_h = float(640) / float(h);
-    ratio_w = float(640) / float(w);
-  }
+  cv::resize(img, resize_img, cv::Size(resize_w, resize_h));
+
+  ratio_h = float(resize_h) / float(h);
+  ratio_w = float(resize_w) / float(w);
 }
 
-void CrnnResizeImg::Run(const cv::Mat &img, cv::Mat &resize_img, float wh_ratio,
-                        bool use_tensorrt,
+void CrnnResizeImg::Run(const cv::Mat &img, cv::Mat &pad_resize_img,
+                        float max_wh_ratio,
                         const std::vector<int> &rec_image_shape) {
   int imgC, imgH, imgW;
   imgC = rec_image_shape[0];
   imgH = rec_image_shape[1];
   imgW = rec_image_shape[2];
+
+  float wh_ratio = 1.0 * imgW / imgH;
+  wh_ratio = std::max(max_wh_ratio, wh_ratio);
 
   imgW = int(32 * wh_ratio);
 
@@ -108,27 +115,16 @@ void CrnnResizeImg::Run(const cv::Mat &img, cv::Mat &resize_img, float wh_ratio,
     resize_w = imgW;
   else
     resize_w = int(ceilf(imgH * ratio));
-  if (!use_tensorrt) {
-    cv::resize(img, resize_img, cv::Size(resize_w, imgH), 0.f, 0.f,
-               cv::INTER_LINEAR);
-    cv::copyMakeBorder(resize_img, resize_img, 0, 0, 0,
-                       int(imgW - resize_img.cols), cv::BORDER_CONSTANT,
-                       {127, 127, 127});
-  } else {
-    int k = int(img.cols * 32 / img.rows);
-    if (k >= 100) {
-      cv::resize(img, resize_img, cv::Size(100, 32), 0.f, 0.f,
-                 cv::INTER_LINEAR);
-    } else {
-      cv::resize(img, resize_img, cv::Size(k, 32), 0.f, 0.f, cv::INTER_LINEAR);
-      cv::copyMakeBorder(resize_img, resize_img, 0, 0, 0, int(100 - k),
-                         cv::BORDER_CONSTANT, {127, 127, 127});
-    }
-  }
+
+  cv::Mat resize_img;
+  cv::resize(img, resize_img, cv::Size(resize_w, imgH), 0.f, 0.f,
+             cv::INTER_LINEAR);
+  cv::copyMakeBorder(resize_img, pad_resize_img, 0, 0, 0,
+                     int(imgW - resize_img.cols), cv::BORDER_CONSTANT,
+                     {127, 127, 127});
 }
 
 void ClsResizeImg::Run(const cv::Mat &img, cv::Mat &resize_img,
-                       bool use_tensorrt,
                        const std::vector<int> &rec_image_shape) {
   int imgC, imgH, imgW;
   imgC = rec_image_shape[0];
@@ -142,15 +138,11 @@ void ClsResizeImg::Run(const cv::Mat &img, cv::Mat &resize_img,
   else
     resize_w = int(ceilf(imgH * ratio));
 
-  if (!use_tensorrt) {
-    cv::resize(img, resize_img, cv::Size(resize_w, imgH), 0.f, 0.f,
-               cv::INTER_LINEAR);
-    if (resize_w < imgW) {
-      cv::copyMakeBorder(resize_img, resize_img, 0, 0, 0, imgW - resize_w,
-                         cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-    }
-  } else {
-    cv::resize(img, resize_img, cv::Size(100, 32), 0.f, 0.f, cv::INTER_LINEAR);
+  cv::resize(img, resize_img, cv::Size(resize_w, imgH), 0.f, 0.f,
+             cv::INTER_LINEAR);
+  if (resize_w < imgW) {
+    cv::copyMakeBorder(resize_img, resize_img, 0, 0, 0, imgW - resize_w,
+                       cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
   }
 }
 

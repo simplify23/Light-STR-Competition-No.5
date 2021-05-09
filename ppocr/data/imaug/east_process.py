@@ -19,21 +19,16 @@ import json
 import sys
 import os
 
-__all__ = ['EASTProcessTrain']
-
 
 class EASTProcessTrain(object):
-    def __init__(self,
-                 image_shape = [512, 512],
-                 background_ratio = 0.125,
-                 min_crop_side_ratio = 0.1,
-                 min_text_size = 10,
-                 **kwargs):
-        self.input_size = image_shape[1]
+    def __init__(self, params):
+        self.img_set_dir = params['img_set_dir']
         self.random_scale = np.array([0.5, 1, 2.0, 3.0])
-        self.background_ratio = background_ratio
-        self.min_crop_side_ratio = min_crop_side_ratio
-        self.min_text_size = min_text_size
+        self.background_ratio = params['background_ratio']
+        self.min_crop_side_ratio = params['min_crop_side_ratio']
+        image_shape = params['image_shape']
+        self.input_size = image_shape[1]
+        self.min_text_size = params['min_text_size']
 
     def preprocess(self, im):
         input_size = self.input_size
@@ -44,7 +39,7 @@ class EASTProcessTrain(object):
         im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale)
         img_mean = [0.485, 0.456, 0.406]
         img_std = [0.229, 0.224, 0.225]
-        # im = im[:, :, ::-1].astype(np.float32)
+        im = im[:, :, ::-1].astype(np.float32)
         im = im / 255
         im -= img_mean
         im /= img_std
@@ -54,6 +49,27 @@ class EASTProcessTrain(object):
         im_padded = im_padded.transpose((2, 0, 1))
         im_padded = im_padded[np.newaxis, :]
         return im_padded, im_scale
+
+    def convert_label_infor(self, label_infor):
+        label_infor = label_infor.decode()
+        label_infor = label_infor.encode('utf-8').decode('utf-8-sig')
+        substr = label_infor.strip("\n").split("\t")
+        img_path = os.path.join(self.img_set_dir, substr[0])
+        label = json.loads(substr[1])
+        nBox = len(label)
+        wordBBs, txts, txt_tags = [], [], []
+        for bno in range(0, nBox):
+            wordBB = label[bno]['points']
+            txt = label[bno]['transcription']
+            wordBBs.append(wordBB)
+            txts.append(txt)
+            if txt == '###':
+                txt_tags.append(True)
+            else:
+                txt_tags.append(False)
+        wordBBs = np.array(wordBBs, dtype=np.float32)
+        txt_tags = np.array(txt_tags, dtype=np.bool)
+        return img_path, wordBBs, txt_tags, txts
 
     def rotate_im_poly(self, im, text_polys):
         """
@@ -286,6 +302,7 @@ class EASTProcessTrain(object):
                   im,
                   polys,
                   tags,
+                  txts,
                   crop_background=False,
                   max_tries=50):
         """
@@ -314,7 +331,7 @@ class EASTProcessTrain(object):
         h_axis = np.where(h_array == 0)[0]
         w_axis = np.where(w_array == 0)[0]
         if len(h_axis) == 0 or len(w_axis) == 0:
-            return im, polys, tags
+            return im, polys, tags, txts
 
         for i in range(max_tries):
             xx = np.random.choice(w_axis, size=2)
@@ -347,22 +364,26 @@ class EASTProcessTrain(object):
                     im = im[ymin:ymax + 1, xmin:xmax + 1, :]
                     polys = []
                     tags = []
-                    return im, polys, tags
+                    txts = []
+                    return im, polys, tags, txts
                 else:
                     continue
 
             im = im[ymin:ymax + 1, xmin:xmax + 1, :]
             polys = polys[selected_polys]
             tags = tags[selected_polys]
+            txts_tmp = []
+            for selected_poly in selected_polys:
+                txts_tmp.append(txts[selected_poly])
+            txts = txts_tmp
             polys[:, :, 0] -= xmin
             polys[:, :, 1] -= ymin
-            return im, polys, tags
-        return im, polys, tags
+            return im, polys, tags, txts
+        return im, polys, tags, txts
 
-    def crop_background_infor(self, im, text_polys, text_tags):
-        im, text_polys, text_tags = self.crop_area(
-            im, text_polys, text_tags, crop_background=True)
-
+    def crop_background_infor(self, im, text_polys, text_tags, text_strs):
+        im, text_polys, text_tags, text_strs = self.crop_area(
+            im, text_polys, text_tags, text_strs, crop_background=True)
         if len(text_polys) > 0:
             return None
         # pad and resize image
@@ -373,10 +394,9 @@ class EASTProcessTrain(object):
         training_mask = np.ones((input_size, input_size), dtype=np.float32)
         return im, score_map, geo_map, training_mask
 
-    def crop_foreground_infor(self, im, text_polys, text_tags):
-        im, text_polys, text_tags = self.crop_area(
-            im, text_polys, text_tags, crop_background=False)
-
+    def crop_foreground_infor(self, im, text_polys, text_tags, text_strs):
+        im, text_polys, text_tags, text_strs = self.crop_area(
+            im, text_polys, text_tags, text_strs, crop_background=False)
         if text_polys.shape[0] == 0:
             return None
         #continue for all ignore case
@@ -394,15 +414,14 @@ class EASTProcessTrain(object):
             (new_h, new_w), text_polys, text_tags)
         return im, score_map, geo_map, training_mask
 
-    def __call__(self, data):
-        im = data['image']
-        text_polys = data['polys']
-        text_tags = data['ignore_tags']
+    def __call__(self, label_infor):
+        infor = self.convert_label_infor(label_infor)
+        im_path, text_polys, text_tags, text_strs = infor
+        im = cv2.imread(im_path)
         if im is None:
             return None
         if text_polys.shape[0] == 0:
             return None
-
         #add rotate cases
         if np.random.rand() < 0.5:
             im, text_polys = self.rotate_im_poly(im, text_polys)
@@ -417,9 +436,11 @@ class EASTProcessTrain(object):
         im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
         text_polys *= rd_scale
         if np.random.rand() < self.background_ratio:
-            outs = self.crop_background_infor(im, text_polys, text_tags)
+            outs = self.crop_background_infor(im, text_polys, text_tags,
+                                              text_strs)
         else:
-            outs = self.crop_foreground_infor(im, text_polys, text_tags)
+            outs = self.crop_foreground_infor(im, text_polys, text_tags,
+                                              text_strs)
 
         if outs is None:
             return None
@@ -430,10 +451,88 @@ class EASTProcessTrain(object):
         geo_map = geo_map[:, ::4, ::4].astype(np.float32)
         training_mask = training_mask[np.newaxis, ::4, ::4]
         training_mask = training_mask.astype(np.float32)
+        return im, score_map, geo_map, training_mask
 
-        data['image'] = im[0]
-        data['score_map'] = score_map
-        data['geo_map'] = geo_map
-        data['training_mask'] = training_mask
-        # print(im.shape, score_map.shape, geo_map.shape, training_mask.shape)
-        return data
+
+class EASTProcessTest(object):
+    def __init__(self, params):
+        super(EASTProcessTest, self).__init__()
+        self.resize_type = 0
+        if 'test_image_shape' in params:
+            self.image_shape = params['test_image_shape']
+            # print(self.image_shape)
+            self.resize_type = 1
+        if 'max_side_len' in params:
+            self.max_side_len = params['max_side_len']
+        else:
+            self.max_side_len = 2400
+
+    def resize_image_type0(self, im):
+        """
+        resize image to a size multiple of 32 which is required by the network
+        args:
+            img(array): array with shape [h, w, c]
+        return(tuple):
+            img, (ratio_h, ratio_w)
+        """
+        max_side_len = self.max_side_len
+        h, w, _ = im.shape
+
+        resize_w = w
+        resize_h = h
+
+        # limit the max side
+        if max(resize_h, resize_w) > max_side_len:
+            if resize_h > resize_w:
+                ratio = float(max_side_len) / resize_h
+            else:
+                ratio = float(max_side_len) / resize_w
+        else:
+            ratio = 1.
+        resize_h = int(resize_h * ratio)
+        resize_w = int(resize_w * ratio)
+        if resize_h % 32 == 0:
+            resize_h = resize_h
+        elif resize_h // 32 <= 1:
+            resize_h = 32
+        else:
+            resize_h = (resize_h // 32) * 32
+        if resize_w % 32 == 0:
+            resize_w = resize_w
+        elif resize_w // 32 <= 1:
+            resize_w = 32
+        else:
+            resize_w = (resize_w // 32) * 32
+        try:
+            if int(resize_w) <= 0 or int(resize_h) <= 0:
+                return None, (None, None)
+            im = cv2.resize(im, (int(resize_w), int(resize_h)))
+        except:
+            print(im.shape, resize_w, resize_h)
+            sys.exit(0)
+        ratio_h = resize_h / float(h)
+        ratio_w = resize_w / float(w)
+        return im, (ratio_h, ratio_w)
+
+    def resize_image_type1(self, im):
+        resize_h, resize_w = self.image_shape
+        ori_h, ori_w = im.shape[:2]  # (h, w, c)
+        im = cv2.resize(im, (int(resize_w), int(resize_h)))
+        ratio_h = float(resize_h) / ori_h
+        ratio_w = float(resize_w) / ori_w
+        return im, (ratio_h, ratio_w)
+
+    def __call__(self, im):
+        if self.resize_type == 0:
+            im, (ratio_h, ratio_w) = self.resize_image_type0(im)
+        else:
+            im, (ratio_h, ratio_w) = self.resize_image_type1(im)
+        img_mean = [0.485, 0.456, 0.406]
+        img_std = [0.229, 0.224, 0.225]
+        im = im[:, :, ::-1].astype(np.float32)
+        im = im / 255
+        im -= img_mean
+        im /= img_std
+        im = im.transpose((2, 0, 1))
+        im = im[np.newaxis, :]
+        return [im, (ratio_h, ratio_w)]

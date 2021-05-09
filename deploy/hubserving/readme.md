@@ -2,14 +2,13 @@
 
 PaddleOCR提供2种服务部署方式：
 - 基于PaddleHub Serving的部署：代码路径为"`./deploy/hubserving`"，按照本教程使用；
-- 基于PaddleServing的部署：代码路径为"`./deploy/pdserving`"，使用方法参考[文档](../../deploy/pdserving/README_CN.md)。
+- 基于PaddleServing的部署：代码路径为"`./deploy/pdserving`"，使用方法参考[文档](../../deploy/pdserving/readme.md)。
 
 # 基于PaddleHub Serving的服务部署
 
 hubserving服务部署目录下包括检测、识别、2阶段串联三种服务包，请根据需求选择相应的服务包进行安装和启动。目录结构如下：
 ```
 deploy/hubserving/
-  └─  ocr_cls     分类模块服务包
   └─  ocr_det     检测模块服务包
   └─  ocr_rec     识别模块服务包
   └─  ocr_system  检测+识别串联服务包
@@ -33,11 +32,11 @@ pip3 install paddlehub --upgrade -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### 2. 下载推理模型
-安装服务模块前，需要准备推理模型并放到正确路径。默认使用的是v2.0版的超轻量模型，默认模型路径为：
+安装服务模块前，需要准备推理模型并放到正确路径。默认使用的是v1.1版的超轻量模型，默认模型路径为：
 ```
-检测模型：./inference/ch_ppocr_mobile_v2.0_det_infer/
-识别模型：./inference/ch_ppocr_mobile_v2.0_rec_infer/
-方向分类器：./inference/ch_ppocr_mobile_v2.0_cls_infer/
+检测模型：./inference/ch_ppocr_mobile_v1.1_det_infer/
+识别模型：./inference/ch_ppocr_mobile_v1.1_rec_infer/
+方向分类器：./inference/ch_ppocr_mobile_v1.1_cls_infer/
 ```  
 
 **模型路径可在`params.py`中查看和修改。** 更多模型可以从PaddleOCR提供的[模型库](../../doc/doc_ch/models_list.md)下载，也可以替换成自己训练转换好的模型。
@@ -50,9 +49,6 @@ PaddleOCR提供3种服务模块，根据需要安装所需模块。
 # 安装检测服务模块：  
 hub install deploy/hubserving/ocr_det/
 
-# 或，安装分类服务模块：  
-hub install deploy/hubserving/ocr_cls/
-
 # 或，安装识别服务模块：  
 hub install deploy/hubserving/ocr_rec/
 
@@ -64,9 +60,6 @@ hub install deploy/hubserving/ocr_system/
 ```shell
 # 安装检测服务模块：  
 hub install deploy\hubserving\ocr_det\
-
-# 或，安装分类服务模块：  
-hub install deploy\hubserving\ocr_cls\
 
 # 或，安装识别服务模块：  
 hub install deploy\hubserving\ocr_rec\
@@ -143,9 +136,8 @@ hub serving start -c deploy/hubserving/ocr_system/config.json
 需要给脚本传递2个参数：  
 - **server_url**：服务地址，格式为  
 `http://[ip_address]:[port]/predict/[module_name]`  
-例如，如果使用配置文件启动分类，检测、识别，检测+分类+识别3阶段服务，那么发送请求的url将分别是：  
-`http://127.0.0.1:8865/predict/ocr_det`  
-`http://127.0.0.1:8866/predict/ocr_cls`  
+例如，如果使用配置文件启动检测、识别、检测+识别2阶段服务，那么发送请求的url将分别是：  
+`http://127.0.0.1:8866/predict/ocr_det`  
 `http://127.0.0.1:8867/predict/ocr_rec`  
 `http://127.0.0.1:8868/predict/ocr_system`  
 - **image_path**：测试图像路径，可以是单张图片路径，也可以是图像集合目录路径  
@@ -157,20 +149,18 @@ hub serving start -c deploy/hubserving/ocr_system/config.json
 返回结果为列表（list），列表中的每一项为词典（dict），词典一共可能包含3种字段，信息如下：
 
 |字段名称|数据类型|意义|
-|----|----|----|
-|angle|str|文本角度|
+|-|-|-|
 |text|str|文本内容|
-|confidence|float| 文本识别置信度或文本角度分类置信度|
+|confidence|float| 文本识别置信度|
 |text_region|list|文本位置坐标|
 
 不同模块返回的字段不同，如，文本识别服务模块返回结果不含`text_region`字段，具体信息如下：
 
-| 字段名/模块名 | ocr_det | ocr_cls | ocr_rec | ocr_system |
-|  ----  |  ----  |  ----  |  ----  |  ----  |
-|angle| | ✔ | | ✔ |
-|text| | |✔|✔|
-|confidence| |✔ |✔|✔|
-|text_region| ✔| | |✔ |
+|字段名/模块名|ocr_det|ocr_rec|ocr_system|
+|-|-|-|-|  
+|text||✔|✔|
+|confidence||✔|✔|
+|text_region|✔||✔|
 
 **说明：** 如果需要增加、删除、修改返回字段，可在相应模块的`module.py`文件中进行修改，完整流程参考下一节自定义修改服务模块。
 

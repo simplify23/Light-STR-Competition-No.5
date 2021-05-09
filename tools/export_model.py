@@ -12,82 +12,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+
 import os
 import sys
-
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '..')))
 
-import argparse
 
-import paddle
-from paddle.jit import to_static
+def set_paddle_flags(**kwargs):
+    for key, value in kwargs.items():
+        if os.environ.get(key, None) is None:
+            os.environ[key] = str(value)
 
-from ppocr.modeling.architectures import build_model
-from ppocr.postprocess import build_post_process
+
+# NOTE(paddle-dev): All of these flags should be
+# set before `import paddle`. Otherwise, it would
+# not take any effect.
+set_paddle_flags(
+    FLAGS_eager_delete_tensor_gb=0,  # enable GC to save memory
+)
+
+import program
+from paddle import fluid
+from ppocr.utils.utility import enable_static_mode
+from ppocr.utils.utility import initial_logger
+logger = initial_logger()
 from ppocr.utils.save_load import init_model
-from ppocr.utils.logging import get_logger
-from tools.program import load_config, merge_config, ArgsParser
 
 
 def main():
-    FLAGS = ArgsParser().parse_args()
-    config = load_config(FLAGS.config)
-    merge_config(FLAGS.opt)
-    logger = get_logger()
-    # build post process
+    startup_prog, eval_program, place, config, _ = program.preprocess()
 
-    post_process_class = build_post_process(config['PostProcess'],
-                                            config['Global'])
+    feeded_var_names, target_vars, fetches_var_name = program.build_export(
+        config, eval_program, startup_prog)
+    eval_program = eval_program.clone(for_test=True)
+    exe = fluid.Executor(place)
+    exe.run(startup_prog)
 
-    # build model
-    # for rec algorithm
-    if hasattr(post_process_class, 'character'):
-        char_num = len(getattr(post_process_class, 'character'))
-        config['Architecture']["Head"]['out_channels'] = char_num
-    model = build_model(config['Architecture'])
-    init_model(config, model, logger)
-    model.eval()
+    init_model(config, eval_program, exe)
 
-    save_path = '{}/inference'.format(config['Global']['save_inference_dir'])
-
-    if config['Architecture']['algorithm'] == "SRN":
-        other_shape = [
-            paddle.static.InputSpec(
-                shape=[None, 1, 64, 256], dtype='float32'), [
-                    paddle.static.InputSpec(
-                        shape=[None, 256, 1],
-                        dtype="int64"), paddle.static.InputSpec(
-                            shape=[None, 25, 1],
-                            dtype="int64"), paddle.static.InputSpec(
-                                shape=[None, 8, 25, 25], dtype="int64"),
-                    paddle.static.InputSpec(
-                        shape=[None, 8, 25, 25], dtype="int64")
-                ]
-        ]
-        model = to_static(model, input_spec=other_shape)
-    else:
-        infer_shape = [3, -1, -1]
-        if config['Architecture']['model_type'] == "rec":
-            infer_shape = [3, 32, -1]  # for rec model, H must be 32
-            if 'Transform' in config['Architecture'] and config['Architecture'][
-                    'Transform'] is not None and config['Architecture'][
-                        'Transform']['name'] == 'TPS':
-                logger.info(
-                    'When there is tps in the network, variable length input is not supported, and the input size needs to be the same as during training'
-                )
-                infer_shape[-1] = 100
-        model = to_static(
-            model,
-            input_spec=[
-                paddle.static.InputSpec(
-                    shape=[None] + infer_shape, dtype='float32')
-            ])
-
-    paddle.jit.save(model, save_path)
-    logger.info('inference model is saved to {}'.format(save_path))
+    save_inference_dir = config['Global']['save_inference_dir']
+    if not os.path.exists(save_inference_dir):
+        os.makedirs(save_inference_dir)
+    fluid.io.save_inference_model(
+        dirname=save_inference_dir,
+        feeded_var_names=feeded_var_names,
+        main_program=eval_program,
+        target_vars=target_vars,
+        executor=exe,
+        model_filename='model',
+        params_filename='params')
+    print("inference model saved in {}/model and {}/params".format(
+        save_inference_dir, save_inference_dir))
+    print("save success, output_name_list:", fetches_var_name)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    enable_static_mode()
     main()

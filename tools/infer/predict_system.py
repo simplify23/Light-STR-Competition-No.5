@@ -13,28 +13,27 @@
 # limitations under the License.
 import os
 import sys
-import subprocess
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '../..')))
 
-os.environ["FLAGS_allocator_strategy"] = 'auto_growth'
+import tools.infer.utility as utility
+from ppocr.utils.utility import initial_logger
 
+logger = initial_logger()
 import cv2
+import tools.infer.predict_det as predict_det
+import tools.infer.predict_rec as predict_rec
+import tools.infer.predict_cls as predict_cls
 import copy
 import numpy as np
+import math
 import time
-from PIL import Image
-import tools.infer.utility as utility
-import tools.infer.predict_rec as predict_rec
-import tools.infer.predict_det as predict_det
-import tools.infer.predict_cls as predict_cls
 from ppocr.utils.utility import get_image_file_list, check_and_read_gif
-from ppocr.utils.logging import get_logger
+from PIL import Image
+from tools.infer.utility import draw_ocr
 from tools.infer.utility import draw_ocr_box_txt
-
-logger = get_logger()
 
 
 class TextSystem(object):
@@ -42,7 +41,6 @@ class TextSystem(object):
         self.text_detector = predict_det.TextDetector(args)
         self.text_recognizer = predict_rec.TextRecognizer(args)
         self.use_angle_cls = args.use_angle_cls
-        self.drop_score = args.drop_score
         if self.use_angle_cls:
             self.text_classifier = predict_cls.TextClassifier(args)
 
@@ -83,13 +81,12 @@ class TextSystem(object):
         bbox_num = len(img_crop_list)
         for bno in range(bbox_num):
             cv2.imwrite("./output/img_crop_%d.jpg" % bno, img_crop_list[bno])
-            logger.info(bno, rec_res[bno])
+            print(bno, rec_res[bno])
 
     def __call__(self, img):
         ori_im = img.copy()
         dt_boxes, elapse = self.text_detector(img)
-        logger.info("dt_boxes num : {}, elapse : {}".format(
-            len(dt_boxes), elapse))
+        print("dt_boxes num : {}, elapse : {}".format(len(dt_boxes), elapse))
         if dt_boxes is None:
             return None, None
         img_crop_list = []
@@ -103,20 +100,12 @@ class TextSystem(object):
         if self.use_angle_cls:
             img_crop_list, angle_list, elapse = self.text_classifier(
                 img_crop_list)
-            logger.info("cls num  : {}, elapse : {}".format(
+            print("cls num  : {}, elapse : {}".format(
                 len(img_crop_list), elapse))
-
         rec_res, elapse = self.text_recognizer(img_crop_list)
-        logger.info("rec_res num  : {}, elapse : {}".format(
-            len(rec_res), elapse))
+        print("rec_res num  : {}, elapse : {}".format(len(rec_res), elapse))
         # self.print_draw_crop_rec_res(img_crop_list, rec_res)
-        filter_boxes, filter_rec_res = [], []
-        for box, rec_reuslt in zip(dt_boxes, rec_res):
-            text, score = rec_reuslt
-            if score >= self.drop_score:
-                filter_boxes.append(box)
-                filter_rec_res.append(rec_reuslt)
-        return filter_boxes, filter_rec_res
+        return dt_boxes, rec_res
 
 
 def sorted_boxes(dt_boxes):
@@ -142,11 +131,9 @@ def sorted_boxes(dt_boxes):
 
 def main(args):
     image_file_list = get_image_file_list(args.image_dir)
-    image_file_list = image_file_list[args.process_id::args.total_process_num]
     text_sys = TextSystem(args)
     is_visualize = True
     font_path = args.vis_font_path
-    drop_score = args.drop_score
     for image_file in image_file_list:
         img, flag = check_and_read_gif(image_file)
         if not flag:
@@ -157,10 +144,15 @@ def main(args):
         starttime = time.time()
         dt_boxes, rec_res = text_sys(img)
         elapse = time.time() - starttime
-        logger.info("Predict time of %s: %.3fs" % (image_file, elapse))
+        print("Predict time of %s: %.3fs" % (image_file, elapse))
 
-        for text, score in rec_res:
-            logger.info("{}, {:.3f}".format(text, score))
+        drop_score = 0.5
+        dt_num = len(dt_boxes)
+        for dno in range(dt_num):
+            text, score = rec_res[dno]
+            if score >= drop_score:
+                text_str = "%s, %.3f" % (text, score)
+                print(text_str)
 
         if is_visualize:
             image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -181,23 +173,9 @@ def main(args):
             cv2.imwrite(
                 os.path.join(draw_img_save, os.path.basename(image_file)),
                 draw_img[:, :, ::-1])
-            logger.info("The visualized image saved in {}".format(
+            print("The visualized image saved in {}".format(
                 os.path.join(draw_img_save, os.path.basename(image_file))))
 
 
 if __name__ == "__main__":
-    args = utility.parse_args()
-    if args.use_mp:
-        p_list = []
-        total_process_num = args.total_process_num
-        for process_id in range(total_process_num):
-            cmd = [sys.executable, "-u"] + sys.argv + [
-                "--process_id={}".format(process_id),
-                "--use_mp={}".format(False)
-            ]
-            p = subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stdout)
-            p_list.append(p)
-        for p in p_list:
-            p.wait()
-    else:
-        main(args)
+    main(utility.parse_args())

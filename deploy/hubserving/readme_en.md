@@ -2,7 +2,7 @@ English | [简体中文](readme.md)
 
 PaddleOCR provides 2 service deployment methods:
 - Based on **PaddleHub Serving**: Code path is "`./deploy/hubserving`". Please follow this tutorial.
-- Based on **PaddleServing**: Code path is "`./deploy/pdserving`". Please refer to the [tutorial](https://github.com/PaddlePaddle/PaddleOCR/blob/dygraph/deploy/pdserving/README.md) for usage.
+- Based on **PaddleServing**: Code path is "`./deploy/pdserving`". Please refer to the [tutorial](../../deploy/pdserving/readme.md) for usage.
 
 # Service deployment based on PaddleHub Serving  
 
@@ -10,7 +10,6 @@ The hubserving service deployment directory includes three service packages: det
 ```
 deploy/hubserving/
   └─  ocr_det     detection module service package
-  └─  ocr_cls     angle class module service package
   └─  ocr_rec     recognition module service package
   └─  ocr_system  two-stage series connection service package
 ```
@@ -34,11 +33,11 @@ pip3 install paddlehub --upgrade -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### 2. Download inference model
-Before installing the service module, you need to prepare the inference model and put it in the correct path. By default, the ultra lightweight model of v2.0 is used, and the default model path is:  
+Before installing the service module, you need to prepare the inference model and put it in the correct path. By default, the ultra lightweight model of v1.1 is used, and the default model path is:  
 ```
-detection model: ./inference/ch_ppocr_mobile_v2.0_det_infer/
-recognition model: ./inference/ch_ppocr_mobile_v2.0_rec_infer/
-text direction classifier: ./inference/ch_ppocr_mobile_v2.0_cls_infer/
+detection model: ./inference/ch_ppocr_mobile_v1.1_det_infer/
+recognition model: ./inference/ch_ppocr_mobile_v1.1_rec_infer/
+text direction classifier: ./inference/ch_ppocr_mobile_v1.1_cls_infer/
 ```  
 
 **The model path can be found and modified in `params.py`.** More models provided by PaddleOCR can be obtained from the [model library](../../doc/doc_en/models_list_en.md). You can also use models trained by yourself.
@@ -51,9 +50,6 @@ PaddleOCR provides 3 kinds of service modules, install the required modules acco
 # Install the detection service module:
 hub install deploy/hubserving/ocr_det/
 
-# Or, install the angle class service module:
-hub install deploy/hubserving/ocr_cls/
-
 # Or, install the recognition service module:
 hub install deploy/hubserving/ocr_rec/
 
@@ -65,9 +61,6 @@ hub install deploy/hubserving/ocr_system/
 ```shell
 # Install the detection service module:
 hub install deploy\hubserving\ocr_det\
-
-# Or, install the angle class service module:
-hub install deploy\hubserving\ocr_cls\
 
 # Or, install the recognition service module:
 hub install deploy\hubserving\ocr_rec\
@@ -149,8 +142,7 @@ Two parameters need to be passed to the script:
 - **server_url**：service address，format of which is
 `http://[ip_address]:[port]/predict/[module_name]`  
 For example, if the detection, recognition and 2-stage serial services are started with provided configuration files, the respective `server_url` would be:  
-`http://127.0.0.1:8865/predict/ocr_det`  
-`http://127.0.0.1:8866/predict/ocr_cls`  
+`http://127.0.0.1:8866/predict/ocr_det`  
 `http://127.0.0.1:8867/predict/ocr_rec`  
 `http://127.0.0.1:8868/predict/ocr_system`  
 - **image_path**：Test image path, can be a single image path or an image directory path
@@ -164,20 +156,18 @@ python tools/test_hubserving.py http://127.0.0.1:8868/predict/ocr_system ./doc/i
 The returned result is a list. Each item in the list is a dict. The dict may contain three fields. The information is as follows:
 
 |field name|data type|description|
-|----|----|----|
-|angle|str|angle|
+|-|-|-|
 |text|str|text content|
 |confidence|float|text recognition confidence|
 |text_region|list|text location coordinates|
 
 The fields returned by different modules are different. For example, the results returned by the text recognition service module do not contain `text_region`. The details are as follows:
 
-| field name/module name | ocr_det | ocr_cls | ocr_rec | ocr_system |
-|  ----  |  ----  |  ----  |  ----  |  ----  |
-|angle| | ✔ | | ✔ |
-|text| | |✔|✔|
-|confidence| |✔ |✔|✔|
-|text_region| ✔| | |✔ |
+|field name/module name|ocr_det|ocr_rec|ocr_system|
+|-|-|-|-|  
+|text||✔|✔|
+|confidence||✔|✔|
+|text_region|✔||✔|
 
 **Note：** If you need to add, delete or modify the returned fields, you can modify the file `module.py` of the corresponding module. For the complete process, refer to the user-defined modification service module in the next section.
 

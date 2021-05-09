@@ -47,20 +47,18 @@ public:
 class ResizeImgType0 {
 public:
   virtual void Run(const cv::Mat &img, cv::Mat &resize_img, int max_size_len,
-                   float &ratio_h, float &ratio_w, bool use_tensorrt);
+                   float &ratio_h, float &ratio_w);
 };
 
 class CrnnResizeImg {
 public:
   virtual void Run(const cv::Mat &img, cv::Mat &resize_img, float wh_ratio,
-                   bool use_tensorrt = false,
                    const std::vector<int> &rec_image_shape = {3, 32, 320});
 };
 
 class ClsResizeImg {
 public:
   virtual void Run(const cv::Mat &img, cv::Mat &resize_img,
-                   bool use_tensorrt = false,
                    const std::vector<int> &rec_image_shape = {3, 48, 192});
 };
 

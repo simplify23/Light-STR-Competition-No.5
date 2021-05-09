@@ -6,20 +6,24 @@ from __future__ import print_function
 import os
 import sys
 sys.path.insert(0, ".")
-import copy
 
+import argparse
+import ast
+import copy
+import math
 import time
 
+from paddle.fluid.core import AnalysisConfig, create_paddle_predictor, PaddleTensor
 from paddlehub.common.logger import logger
 from paddlehub.module.module import moduleinfo, runnable, serving
+from PIL import Image
 import cv2
 import numpy as np
+import paddle.fluid as fluid
 import paddlehub as hub
 
 from tools.infer.utility import base64_to_cv2
 from tools.infer.predict_system import TextSystem
-from deploy.hubserving.ocr_system.params import read_params
-from tools.infer.utility import parse_args
 
 
 @moduleinfo(
@@ -34,7 +38,8 @@ class OCRSystem(hub.Module):
         """
         initialize with the necessary elements
         """
-        cfg = self.merge_configs()
+        from ocr_system.params import read_params
+        cfg = read_params()
 
         cfg.use_gpu = use_gpu
         if use_gpu:
@@ -52,20 +57,6 @@ class OCRSystem(hub.Module):
         cfg.enable_mkldnn = enable_mkldnn
 
         self.text_sys = TextSystem(cfg)
-
-    def merge_configs(self, ):
-        # deafult cfg
-        backup_argv = copy.deepcopy(sys.argv)
-        sys.argv = sys.argv[:1]
-        cfg = parse_args()
-
-        update_cfg_map = vars(read_params())
-
-        for key in update_cfg_map:
-            cfg.__setattr__(key, update_cfg_map[key])
-
-        sys.argv = copy.deepcopy(backup_argv)
-        return cfg
 
     def read_images(self, paths=[]):
         images = []

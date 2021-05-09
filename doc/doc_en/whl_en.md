@@ -1,10 +1,13 @@
 # paddleocr package
 
-## 1 Get started quickly
-### 1.1 install package
+## Get started quickly
+### install package
+
+First, you need to refer to [installation document](installation_en.md) to install paddlepaddle, and then start to install paddleocr package
+
 install by pypi
 ```bash
-pip install "paddleocr>=2.0.1" # Recommend to use version 2.0.1+
+pip install paddleocr
 ```
 
 build own whl package and install
@@ -12,11 +15,9 @@ build own whl package and install
 python3 setup.py bdist_wheel
 pip3 install dist/paddleocr-x.x.x-py3-none-any.whl # x.x.x is the version of paddleocr
 ```
-## 2 Use
-### 2.1 Use by code
-The paddleocr whl package will automatically download the ppocr lightweight model as the default model, which can be customized and replaced according to the section 3 **Custom Model**.
+### 1. Use by code
 
-* detection angle classification and recognition
+* detection classification and recognition
 ```python
 from paddleocr import PaddleOCR,draw_ocr
 # Paddleocr supports Chinese, English, French, German, Korean and Japanese.
@@ -35,7 +36,7 @@ image = Image.open(img_path).convert('RGB')
 boxes = [line[0] for line in result]
 txts = [line[1][0] for line in result]
 scores = [line[1][1] for line in result]
-im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
+im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/simfang.ttf')
 im_show = Image.fromarray(im_show)
 im_show.save('result.jpg')
 ```
@@ -69,7 +70,7 @@ image = Image.open(img_path).convert('RGB')
 boxes = [line[0] for line in result]
 txts = [line[1][0] for line in result]
 scores = [line[1][1] for line in result]
-im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
+im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/simfang.ttf')
 im_show = Image.fromarray(im_show)
 im_show.save('result.jpg')
 ```
@@ -116,7 +117,7 @@ for line in result:
 from PIL import Image
 
 image = Image.open(img_path).convert('RGB')
-im_show = draw_ocr(image, result, txts=None, scores=None, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
+im_show = draw_ocr(image, result, txts=None, scores=None, font_path='/path/to/PaddleOCR/doc/simfang.ttf')
 im_show = Image.fromarray(im_show)
 im_show.save('result.jpg')
 ```
@@ -165,7 +166,7 @@ Output will be a list, each item contains classification result and confidence
 ['0', 0.99999964]
 ```
 
-### 2.2 Use by command line
+### Use by command line
 
 show help information
 ```bash
@@ -241,11 +242,11 @@ Output will be a list, each item contains classification result and confidence
 ['0', 0.99999964]
 ```
 
-## 3 Use custom model
+## Use custom model
 When the built-in model cannot meet the needs, you need to use your own trained model.
 First, refer to the first section of [inference_en.md](./inference_en.md) to convert your det and rec model to inference model, and then use it as follows
 
-### 3.1 Use by code
+### 1. Use by code
 
 ```python
 from paddleocr import PaddleOCR,draw_ocr
@@ -262,71 +263,18 @@ image = Image.open(img_path).convert('RGB')
 boxes = [line[0] for line in result]
 txts = [line[1][0] for line in result]
 scores = [line[1][1] for line in result]
-im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
+im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/simfang.ttf')
 im_show = Image.fromarray(im_show)
 im_show.save('result.jpg')
 ```
 
-### 3.2 Use by command line
+### Use by command line
 
 ```bash
 paddleocr --image_dir PaddleOCR/doc/imgs/11.jpg --det_model_dir {your_det_model_dir} --rec_model_dir {your_rec_model_dir} --rec_char_dict_path {your_rec_char_dict_path} --cls_model_dir {your_cls_model_dir} --use_angle_cls true
 ```
 
-## 4 Use web images or numpy array as input
-
-### 4.1 Web image
-
-- Use by code
-```python
-from paddleocr import PaddleOCR, draw_ocr
-ocr = PaddleOCR(use_angle_cls=True, lang="ch") # need to run only once to download and load model into memory
-img_path = 'http://n.sinaimg.cn/ent/transform/w630h933/20171222/o111-fypvuqf1838418.jpg'
-result = ocr.ocr(img_path, cls=True)
-for line in result:
-    print(line)
-
-# show result
-from PIL import Image
-image = Image.open(img_path).convert('RGB')
-boxes = [line[0] for line in result]
-txts = [line[1][0] for line in result]
-scores = [line[1][1] for line in result]
-im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
-im_show = Image.fromarray(im_show)
-im_show.save('result.jpg')
-```
-- Use by command line
-```bash
-paddleocr --image_dir http://n.sinaimg.cn/ent/transform/w630h933/20171222/o111-fypvuqf1838418.jpg --use_angle_cls=true
-```
-
-### 4.2 Numpy array
-Support numpy array as input only when used by code
-
-```python
-from paddleocr import PaddleOCR, draw_ocr
-ocr = PaddleOCR(use_angle_cls=True, lang="ch") # need to run only once to download and load model into memory
-img_path = 'PaddleOCR/doc/imgs/11.jpg'
-img = cv2.imread(img_path)
-# img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY), If your own training model supports grayscale images, you can uncomment this line
-result = ocr.ocr(img_path, cls=True)
-for line in result:
-    print(line)
-
-# show result
-from PIL import Image
-image = Image.open(img_path).convert('RGB')
-boxes = [line[0] for line in result]
-txts = [line[1][0] for line in result]
-scores = [line[1][1] for line in result]
-im_show = draw_ocr(image, boxes, txts, scores, font_path='/path/to/PaddleOCR/doc/fonts/simfang.ttf')
-im_show = Image.fromarray(im_show)
-im_show.save('result.jpg')
-```
-
-
-## 5 Parameter Description
+## Parameter Description
 
 | Parameter                    | Description                                                                                                                                                                                                                 | Default value                  |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
@@ -350,7 +298,6 @@ im_show.save('result.jpg')
 | max_text_length         | The maximum text length that the recognition algorithm can recognize                                                                                                                                                                                         | 25                      |
 | rec_char_dict_path      | the alphabet path which needs to be modified to your own path when `rec_model_Name` use mode 2                                                                                                                                              | ./ppocr/utils/ppocr_keys_v1.txt                        |
 | use_space_char          | Whether to recognize spaces                                                                                                                                                                                                         | TRUE                    |
-| drop_score          | Filter the output by score (from the recognition model), and those below this score will not be returned                                                                                                                                                                                                        | 0.5                    |
 | use_angle_cls          | Whether to load classification model                                                                                                                                                                                                       | FALSE                    |
 | cls_model_dir           | the classification inference model folder. There are two ways to transfer parameters, 1. None: Automatically download the built-in model to `~/.paddleocr/cls`; 2. The path of the inference model converted by yourself, the model and params files must be included in the model path | None |
 | cls_image_shape         | image shape of classification algorithm                                                                                                                                                                                            | "3,48,192"              |
@@ -361,4 +308,4 @@ im_show.save('result.jpg')
 | lang                     | The support language, now only Chinese(ch)、English(en)、French(french)、German(german)、Korean(korean)、Japanese(japan) are supported                                                                                                                                                                                                  | ch                    |
 | det                     | Enable detction when `ppocr.ocr` func exec                                                                                                                                                                                                   | TRUE                    |
 | rec                     | Enable recognition when `ppocr.ocr` func exec                                                                                                                                                                                                   | TRUE                    |
-| cls                     | Enable classification when `ppocr.ocr` func exec((Use use_angle_cls in command line mode to control whether to start classification in the forward direction)                                                                                                                                                                                                   | FALSE                    |
+| cls                     | Enable classification when `ppocr.ocr` func exec，this parameter only exists in `code usage` mode                                                                                                                                                                                                   | FALSE                    |

@@ -13,71 +13,52 @@
 # limitations under the License.
 import os
 import sys
-
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '../..')))
 
-os.environ["FLAGS_allocator_strategy"] = 'auto_growth'
-
 import cv2
+import copy
 import numpy as np
+import math
 import time
 import sys
 
-import tools.infer.utility as utility
-from ppocr.utils.logging import get_logger
-from ppocr.utils.utility import get_image_file_list, check_and_read_gif
-from ppocr.data import create_operators, transform
-from ppocr.postprocess import build_post_process
+import paddle.fluid as fluid
 
-logger = get_logger()
+import tools.infer.utility as utility
+from ppocr.utils.utility import initial_logger
+logger = initial_logger()
+from ppocr.utils.utility import get_image_file_list, check_and_read_gif
+from ppocr.data.det.sast_process import SASTProcessTest
+from ppocr.data.det.east_process import EASTProcessTest
+from ppocr.data.det.db_process import DBProcessTest
+from ppocr.postprocess.db_postprocess import DBPostProcess
+from ppocr.postprocess.east_postprocess import EASTPostPocess
+from ppocr.postprocess.sast_postprocess import SASTPostProcess
 
 
 class TextDetector(object):
     def __init__(self, args):
-        self.args = args
+        max_side_len = args.det_max_side_len
         self.det_algorithm = args.det_algorithm
-        pre_process_list = [{
-            'DetResizeForTest': {
-                'limit_side_len': args.det_limit_side_len,
-                'limit_type': args.det_limit_type
-            }
-        }, {
-            'NormalizeImage': {
-                'std': [0.229, 0.224, 0.225],
-                'mean': [0.485, 0.456, 0.406],
-                'scale': '1./255.',
-                'order': 'hwc'
-            }
-        }, {
-            'ToCHWImage': None
-        }, {
-            'KeepKeys': {
-                'keep_keys': ['image', 'shape']
-            }
-        }]
+        preprocess_params = {'max_side_len': max_side_len}
         postprocess_params = {}
         if self.det_algorithm == "DB":
-            postprocess_params['name'] = 'DBPostProcess'
+            self.preprocess_op = DBProcessTest(preprocess_params)
             postprocess_params["thresh"] = args.det_db_thresh
             postprocess_params["box_thresh"] = args.det_db_box_thresh
             postprocess_params["max_candidates"] = 1000
             postprocess_params["unclip_ratio"] = args.det_db_unclip_ratio
-            postprocess_params["use_dilation"] = args.use_dilation
-            postprocess_params["score_mode"] = args.det_db_score_mode
+            self.postprocess_op = DBPostProcess(postprocess_params)
         elif self.det_algorithm == "EAST":
-            postprocess_params['name'] = 'EASTPostProcess'
+            self.preprocess_op = EASTProcessTest(preprocess_params)
             postprocess_params["score_thresh"] = args.det_east_score_thresh
             postprocess_params["cover_thresh"] = args.det_east_cover_thresh
             postprocess_params["nms_thresh"] = args.det_east_nms_thresh
+            self.postprocess_op = EASTPostPocess(postprocess_params)
         elif self.det_algorithm == "SAST":
-            pre_process_list[0] = {
-                'DetResizeForTest': {
-                    'resize_long': args.det_limit_side_len
-                }
-            }
-            postprocess_params['name'] = 'SASTPostProcess'
+            self.preprocess_op = SASTProcessTest(preprocess_params)
             postprocess_params["score_thresh"] = args.det_sast_score_thresh
             postprocess_params["nms_thresh"] = args.det_sast_nms_thresh
             self.det_sast_polygon = args.det_sast_polygon
@@ -89,15 +70,14 @@ class TextDetector(object):
                 postprocess_params["sample_pts_num"] = 2
                 postprocess_params["expand_scale"] = 1.0
                 postprocess_params["shrink_ratio_of_width"] = 0.3
+            self.postprocess_op = SASTPostProcess(postprocess_params)
         else:
             logger.info("unknown det_algorithm:{}".format(self.det_algorithm))
             sys.exit(0)
-
-        self.preprocess_op = create_operators(pre_process_list)
-        self.postprocess_op = build_post_process(postprocess_params)
-        self.predictor, self.input_tensor, self.output_tensors = utility.create_predictor(
-            args, 'det', logger)  # paddle.jit.load(args.det_model_dir)
-        # self.predictor.eval()
+        if args.use_pdserving is False:
+            self.use_zero_copy_run = args.use_zero_copy_run
+            self.predictor, self.input_tensor, self.output_tensors =\
+                utility.create_predictor(args, mode="det")
 
     def order_points_clockwise(self, pts):
         """
@@ -154,38 +134,35 @@ class TextDetector(object):
 
     def __call__(self, img):
         ori_im = img.copy()
-        data = {'image': img}
-        data = transform(data, self.preprocess_op)
-        img, shape_list = data
-        if img is None:
+        im, ratio_list = self.preprocess_op(img)
+        if im is None:
             return None, 0
-        img = np.expand_dims(img, axis=0)
-        shape_list = np.expand_dims(shape_list, axis=0)
-        img = img.copy()
+        im = im.copy()
         starttime = time.time()
-        self.input_tensor.copy_from_cpu(img)
-        self.predictor.run()
+        if self.use_zero_copy_run:
+            self.input_tensor.copy_from_cpu(im)
+            self.predictor.zero_copy_run()
+        else:
+            im = fluid.core.PaddleTensor(im)
+            self.predictor.run([im])
         outputs = []
         for output_tensor in self.output_tensors:
             output = output_tensor.copy_to_cpu()
             outputs.append(output)
-
-        preds = {}
+        outs_dict = {}
         if self.det_algorithm == "EAST":
-            preds['f_geo'] = outputs[0]
-            preds['f_score'] = outputs[1]
+            outs_dict['f_geo'] = outputs[0]
+            outs_dict['f_score'] = outputs[1]
         elif self.det_algorithm == 'SAST':
-            preds['f_border'] = outputs[0]
-            preds['f_score'] = outputs[1]
-            preds['f_tco'] = outputs[2]
-            preds['f_tvo'] = outputs[3]
-        elif self.det_algorithm == 'DB':
-            preds['maps'] = outputs[0]
+            outs_dict['f_border'] = outputs[0]
+            outs_dict['f_score'] = outputs[1]
+            outs_dict['f_tco'] = outputs[2]
+            outs_dict['f_tvo'] = outputs[3]
         else:
-            raise NotImplementedError
-        self.predictor.try_shrink_memory()
-        post_result = self.postprocess_op(preds, shape_list)
-        dt_boxes = post_result[0]['points']
+            outs_dict['maps'] = outputs[0]
+
+        dt_boxes_list = self.postprocess_op(outs_dict, [ratio_list])
+        dt_boxes = dt_boxes_list[0]
         if self.det_algorithm == "SAST" and self.det_sast_polygon:
             dt_boxes = self.filter_tag_det_res_only_clip(dt_boxes, ori_im.shape)
         else:
@@ -200,7 +177,7 @@ if __name__ == "__main__":
     text_detector = TextDetector(args)
     count = 0
     total_time = 0
-    draw_img_save = "./inference_results"
+    draw_img_save = os.path.join(".", "inference_results")
     if not os.path.exists(draw_img_save):
         os.makedirs(draw_img_save)
     for image_file in image_file_list:
@@ -214,12 +191,13 @@ if __name__ == "__main__":
         if count > 0:
             total_time += elapse
         count += 1
-        logger.info("Predict time of {}: {}".format(image_file, elapse))
+        logger.info("The predicted time of img: {} is  {}:".format(image_file,
+                                                                   elapse))
         src_im = utility.draw_text_det_res(dt_boxes, image_file)
-        img_name_pure = os.path.split(image_file)[-1]
-        img_path = os.path.join(draw_img_save,
-                                "det_res_{}".format(img_name_pure))
-        cv2.imwrite(img_path, src_im)
-        logger.info("The visualized image saved in {}".format(img_path))
+        img_name_pure = image_file.split("/")[-1]
+        cv2.imwrite(
+            os.path.join(draw_img_save, "det_res_%s" % img_name_pure), src_im)
+        logger.info("The visualized img saved in {}".format(
+            os.path.join(draw_img_save, "det_res_%s" % img_name_pure)))
     if count > 1:
         logger.info("Avg Time: {}".format(total_time / (count - 1)))

@@ -18,54 +18,83 @@ from __future__ import print_function
 
 import os
 import sys
-
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(__dir__)
 sys.path.append(os.path.abspath(os.path.join(__dir__, '..')))
 
-from ppocr.data import build_dataloader
-from ppocr.modeling.architectures import build_model
-from ppocr.postprocess import build_post_process
-from ppocr.metrics import build_metric
+
+def set_paddle_flags(**kwargs):
+    for key, value in kwargs.items():
+        if os.environ.get(key, None) is None:
+            os.environ[key] = str(value)
+
+
+# NOTE(paddle-dev): All of these flags should be
+# set before `import paddle`. Otherwise, it would
+# not take any effect.
+set_paddle_flags(
+    FLAGS_eager_delete_tensor_gb=0,  # enable GC to save memory
+)
+
+import program
+from paddle import fluid
+from ppocr.utils.utility import initial_logger
+from ppocr.utils.utility import enable_static_mode
+logger = initial_logger()
+from ppocr.data.reader_main import reader_main
 from ppocr.utils.save_load import init_model
-from ppocr.utils.utility import print_dict
-import tools.program as program
+from eval_utils.eval_det_utils import eval_det_run
+from eval_utils.eval_rec_utils import test_rec_benchmark
+from eval_utils.eval_rec_utils import eval_rec_run
+from eval_utils.eval_cls_utils import eval_cls_run
 
 
 def main():
-    global_config = config['Global']
-    # build dataloader
-    valid_dataloader = build_dataloader(config, 'Eval', device, logger)
+    startup_prog, eval_program, place, config, train_alg_type = program.preprocess(
+    )
+    eval_build_outputs = program.build(
+        config, eval_program, startup_prog, mode='test')
+    eval_fetch_name_list = eval_build_outputs[1]
+    eval_fetch_varname_list = eval_build_outputs[2]
+    eval_program = eval_program.clone(for_test=True)
+    exe = fluid.Executor(place)
+    exe.run(startup_prog)
 
-    # build post process
-    post_process_class = build_post_process(config['PostProcess'],
-                                            global_config)
+    init_model(config, eval_program, exe)
 
-    # build model
-    # for rec algorithm
-    if hasattr(post_process_class, 'character'):
-        config['Architecture']["Head"]['out_channels'] = len(
-            getattr(post_process_class, 'character'))
-    model = build_model(config['Architecture'])
-    use_srn = config['Architecture']['algorithm'] == "SRN"
-
-    best_model_dict = init_model(config, model, logger)
-    if len(best_model_dict):
-        logger.info('metric in ckpt ***************')
-        for k, v in best_model_dict.items():
-            logger.info('{}:{}'.format(k, v))
-
-    # build metric
-    eval_class = build_metric(config['Metric'])
-
-    # start eval
-    metric = program.eval(model, valid_dataloader, post_process_class,
-                          eval_class, use_srn)
-    logger.info('metric eval ***************')
-    for k, v in metric.items():
-        logger.info('{}:{}'.format(k, v))
+    if train_alg_type == 'det':
+        eval_reader = reader_main(config=config, mode="eval")
+        eval_info_dict = {'program':eval_program,\
+            'reader':eval_reader,\
+            'fetch_name_list':eval_fetch_name_list,\
+            'fetch_varname_list':eval_fetch_varname_list}
+        metrics = eval_det_run(exe, config, eval_info_dict, "eval")
+        logger.info("Eval result: {}".format(metrics))
+    elif train_alg_type == 'cls':
+        eval_reader = reader_main(config=config, mode="eval")
+        eval_info_dict = {'program': eval_program, \
+                          'reader': eval_reader, \
+                          'fetch_name_list': eval_fetch_name_list, \
+                          'fetch_varname_list': eval_fetch_varname_list}
+        metrics = eval_cls_run(exe, eval_info_dict)
+        logger.info("Eval result: {}".format(metrics))
+    else:
+        reader_type = config['Global']['reader_yml']
+        if "benchmark" not in reader_type:
+            eval_reader = reader_main(config=config, mode="eval")
+            eval_info_dict = {'program': eval_program, \
+                              'reader': eval_reader, \
+                              'fetch_name_list': eval_fetch_name_list, \
+                              'fetch_varname_list': eval_fetch_varname_list}
+            metrics = eval_rec_run(exe, config, eval_info_dict, "eval")
+            logger.info("Eval result: {}".format(metrics))
+        else:
+            eval_info_dict = {'program':eval_program,\
+                'fetch_name_list':eval_fetch_name_list,\
+                'fetch_varname_list':eval_fetch_varname_list}
+            test_rec_benchmark(exe, config, eval_info_dict)
 
 
 if __name__ == '__main__':
-    config, device, logger, vdl_writer = program.preprocess()
+    enable_static_mode()
     main()

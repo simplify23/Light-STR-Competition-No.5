@@ -14,29 +14,33 @@ c. NVIDIA Container Toolkit（GPU，Docker 19.03以上版本可以跳过此步�
 d. cuDNN 7.6+（GPU）
 
 ## 2.制作镜像
-a.切换至Dockerfile目录（注：需要区分cpu或gpu版本，下文以cpu为例，gpu版本需要替换一下关键字即可）
+a.下载PaddleOCR项目代码
+```
+git clone https://github.com/PaddlePaddle/PaddleOCR.git
+```
+b.切换至Dockerfile目录（注：需要区分cpu或gpu版本，下文以cpu为例，gpu版本需要替换一下关键字即可）
 ```
 cd deploy/docker/hubserving/cpu
 ```
 c.生成镜像
 ```
-docker build -t paddleocr:cpu .
+docker build -t paddleocr:cpu . 
 ```
 
 ## 3.启动Docker容器
 a. CPU 版本
 ```
-sudo docker run -dp 8868:8868 --name paddle_ocr paddleocr:cpu
+sudo docker run -dp 8866:8866 --name paddle_ocr paddleocr:cpu
 ```
 b. GPU 版本 (通过NVIDIA Container Toolkit)
 ```
-sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
+sudo nvidia-docker run -dp 8866:8866 --name paddle_ocr paddleocr:gpu
 ```
 c. GPU 版本 (Docker 19.03以上版本，可以直接用如下命令)
 ```
-sudo docker run -dp 8868:8869 --gpus all --name paddle_ocr paddleocr:gpu
+sudo docker run -dp 8866:8866 --gpus all --name paddle_ocr paddleocr:gpu
 ```
-d. 检查服务运行情况（出现：Successfully installed ocr_system和Running on http://0.0.0.0:8868 等信息，表示运行成功）
+d. 检查服务运行情况（出现：Successfully installed ocr_system和Running on http://0.0.0.0:8866/等信息，表示运行成功）
 ```
 docker logs -f paddle_ocr
 ```
@@ -45,7 +49,7 @@ docker logs -f paddle_ocr
 a. 计算待识别图片的Base64编码（如果只是测试一下效果，可以通过免费的在线工具实现，如：http://tool.chinaz.com/tools/imgtobase/）
 b. 发送服务请求（可参见sample_request.txt中的值）
 ```
-curl -H "Content-Type:application/json" -X POST --data "{\"images\": [\"填入图片Base64编码(需要删除'data:image/jpg;base64,'）\"]}" http://localhost:8868/predict/ocr_system
+curl -H "Content-Type:application/json" -X POST --data "{\"images\": [\"填入图片Base64编码(需要删除'data:image/jpg;base64,'）\"]}" http://localhost:8866/predict/ocr_system
 ```
 c. 返回结果（如果调用成功，会返回如下结果）
 ```

@@ -25,3 +25,5 @@ output/
 build/
 dist/
 paddleocr.egg-info/
+README.md
+README_ch.md

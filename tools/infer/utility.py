@@ -13,14 +13,18 @@
 # limitations under the License.
 
 import argparse
-import os
-import sys
+import os, sys
+from ppocr.utils.utility import initial_logger
+
+logger = initial_logger()
+from paddle.fluid.core import PaddleTensor
+from paddle.fluid.core import AnalysisConfig
+from paddle.fluid.core import create_paddle_predictor
 import cv2
 import numpy as np
 import json
 from PIL import Image, ImageDraw, ImageFont
 import math
-from paddle import inference
 
 
 def parse_args():
@@ -32,23 +36,19 @@ def parse_args():
     parser.add_argument("--use_gpu", type=str2bool, default=True)
     parser.add_argument("--ir_optim", type=str2bool, default=True)
     parser.add_argument("--use_tensorrt", type=str2bool, default=False)
-    parser.add_argument("--use_fp16", type=str2bool, default=False)
-    parser.add_argument("--gpu_mem", type=int, default=500)
+    parser.add_argument("--gpu_mem", type=int, default=8000)
 
     # params for text detector
     parser.add_argument("--image_dir", type=str)
     parser.add_argument("--det_algorithm", type=str, default='DB')
     parser.add_argument("--det_model_dir", type=str)
-    parser.add_argument("--det_limit_side_len", type=float, default=960)
-    parser.add_argument("--det_limit_type", type=str, default='max')
+    parser.add_argument("--det_max_side_len", type=float, default=960)
 
     # DB parmas
     parser.add_argument("--det_db_thresh", type=float, default=0.3)
     parser.add_argument("--det_db_box_thresh", type=float, default=0.5)
     parser.add_argument("--det_db_unclip_ratio", type=float, default=1.6)
-    parser.add_argument("--max_batch_size", type=int, default=10)
-    parser.add_argument("--use_dilation", type=bool, default=False)
-    parser.add_argument("--det_db_score_mode", type=str, default="fast")
+
     # EAST parmas
     parser.add_argument("--det_east_score_thresh", type=float, default=0.8)
     parser.add_argument("--det_east_cover_thresh", type=float, default=0.1)
@@ -72,42 +72,31 @@ def parse_args():
         default="./ppocr/utils/ppocr_keys_v1.txt")
     parser.add_argument("--use_space_char", type=str2bool, default=True)
     parser.add_argument(
-        "--vis_font_path", type=str, default="./doc/fonts/simfang.ttf")
-    parser.add_argument("--drop_score", type=float, default=0.5)
-
-    # params for e2e
-    parser.add_argument("--e2e_algorithm", type=str, default='PGNet')
-    parser.add_argument("--e2e_model_dir", type=str)
-    parser.add_argument("--e2e_limit_side_len", type=float, default=768)
-    parser.add_argument("--e2e_limit_type", type=str, default='max')
-
-    # PGNet parmas
-    parser.add_argument("--e2e_pgnet_score_thresh", type=float, default=0.5)
-    parser.add_argument(
-        "--e2e_char_dict_path", type=str, default="./ppocr/utils/ic15_dict.txt")
-    parser.add_argument("--e2e_pgnet_valid_set", type=str, default='totaltext')
-    parser.add_argument("--e2e_pgnet_polygon", type=bool, default=True)
-    parser.add_argument("--e2e_pgnet_mode", type=str, default='fast')
+        "--vis_font_path", type=str, default="./doc/simfang.ttf")
 
     # params for text classifier
     parser.add_argument("--use_angle_cls", type=str2bool, default=False)
     parser.add_argument("--cls_model_dir", type=str)
     parser.add_argument("--cls_image_shape", type=str, default="3, 48, 192")
     parser.add_argument("--label_list", type=list, default=['0', '180'])
-    parser.add_argument("--cls_batch_num", type=int, default=6)
+    parser.add_argument("--cls_batch_num", type=int, default=30)
     parser.add_argument("--cls_thresh", type=float, default=0.9)
 
     parser.add_argument("--enable_mkldnn", type=str2bool, default=False)
-    parser.add_argument("--use_pdserving", type=str2bool, default=False)
+    parser.add_argument("--use_zero_copy_run", type=str2bool, default=False)
 
-    parser.add_argument("--use_mp", type=str2bool, default=False)
-    parser.add_argument("--total_process_num", type=int, default=1)
-    parser.add_argument("--process_id", type=int, default=0)
+    parser.add_argument("--use_pdserving", type=str2bool, default=False)
 
     return parser.parse_args()
 
 
-def create_predictor(args, mode, logger):
+def create_predictor(args, mode):
+    """
+    create predictor for inference
+    :param args: params for prediction engine
+    :param mode: mode
+    :return: predictor
+    """
     if mode == "det":
         model_dir = args.det_model_dir
     elif mode == 'cls':
@@ -115,13 +104,15 @@ def create_predictor(args, mode, logger):
     elif mode == 'rec':
         model_dir = args.rec_model_dir
     else:
-        model_dir = args.e2e_model_dir
+        raise ValueError(
+            "'mode' of create_predictor() can only be one of ['det', 'cls', 'rec']"
+        )
 
     if model_dir is None:
         logger.info("not find {} model file path {}".format(mode, model_dir))
         sys.exit(0)
-    model_file_path = model_dir + "/inference.pdmodel"
-    params_file_path = model_dir + "/inference.pdiparams"
+    model_file_path = model_dir + "/model"
+    params_file_path = model_dir + "/params"
     if not os.path.exists(model_file_path):
         logger.info("not find model file path {}".format(model_file_path))
         sys.exit(0)
@@ -129,15 +120,10 @@ def create_predictor(args, mode, logger):
         logger.info("not find params file path {}".format(params_file_path))
         sys.exit(0)
 
-    config = inference.Config(model_file_path, params_file_path)
+    config = AnalysisConfig(model_file_path, params_file_path)
 
     if args.use_gpu:
         config.enable_use_gpu(args.gpu_mem, 0)
-        if args.use_tensorrt:
-            config.enable_tensorrt_engine(
-                precision_mode=inference.PrecisionType.Half
-                if args.use_fp16 else inference.PrecisionType.Float32,
-                max_batch_size=args.max_batch_size)
     else:
         config.disable_gpu()
         config.set_cpu_math_library_num_threads(6)
@@ -145,47 +131,35 @@ def create_predictor(args, mode, logger):
             # cache 10 different shapes for mkldnn to avoid memory leak
             config.set_mkldnn_cache_capacity(10)
             config.enable_mkldnn()
-            #  TODO LDOUBLEV: fix mkldnn bug when bach_size  > 1
-            #config.set_mkldnn_op({'conv2d', 'depthwise_conv2d', 'pool2d', 'batch_norm'})
-            args.rec_batch_num = 1
 
-    # enable memory optim
-    config.enable_memory_optim()
+    # config.enable_memory_optim()
     config.disable_glog_info()
 
-    config.delete_pass("conv_transpose_eltwiseadd_bn_fuse_pass")
-    config.switch_use_feed_fetch_ops(False)
+    if args.use_zero_copy_run:
+        config.delete_pass("conv_transpose_eltwiseadd_bn_fuse_pass")
+        config.switch_use_feed_fetch_ops(False)
+    else:
+        config.switch_use_feed_fetch_ops(True)
 
-    # create predictor
-    predictor = inference.create_predictor(config)
+    predictor = create_paddle_predictor(config)
     input_names = predictor.get_input_names()
     for name in input_names:
-        input_tensor = predictor.get_input_handle(name)
+        input_tensor = predictor.get_input_tensor(name)
     output_names = predictor.get_output_names()
     output_tensors = []
     for output_name in output_names:
-        output_tensor = predictor.get_output_handle(output_name)
+        output_tensor = predictor.get_output_tensor(output_name)
         output_tensors.append(output_tensor)
     return predictor, input_tensor, output_tensors
 
 
-def draw_e2e_res(dt_boxes, strs, img_path):
-    src_im = cv2.imread(img_path)
-    for box, str in zip(dt_boxes, strs):
-        box = box.astype(np.int32).reshape((-1, 1, 2))
-        cv2.polylines(src_im, [box], True, color=(255, 255, 0), thickness=2)
-        cv2.putText(
-            src_im,
-            str,
-            org=(int(box[0, 0, 0]), int(box[0, 0, 1])),
-            fontFace=cv2.FONT_HERSHEY_COMPLEX,
-            fontScale=0.7,
-            color=(0, 255, 0),
-            thickness=1)
-    return src_im
-
-
 def draw_text_det_res(dt_boxes, img_path):
+    """
+    Visualize the results of detection
+    :param dt_boxes: The boxes predicted by detection model
+    :param img_path: Image path
+    :return: Visualized image
+    """
     src_im = cv2.imread(img_path)
     for box in dt_boxes:
         box = np.array(box).astype(np.int32).reshape(-1, 2)
@@ -201,8 +175,8 @@ def resize_img(img, input_size=600):
     im_shape = img.shape
     im_size_max = np.max(im_shape[0:2])
     im_scale = float(input_size) / float(im_size_max)
-    img = cv2.resize(img, None, None, fx=im_scale, fy=im_scale)
-    return img
+    im = cv2.resize(img, None, None, fx=im_scale, fy=im_scale)
+    return im
 
 
 def draw_ocr(image,
@@ -303,6 +277,7 @@ def str_count(s):
     Count the number of Chinese characters,
     a single English character and a single number
     equal to half the length of Chinese characters.
+
     args:
         s(string): the input of string
     return(int):
@@ -337,6 +312,7 @@ def text_visual(texts,
         img_w(int): the width of blank img
         font_path: the path of font which is used to draw text
     return(array):
+
     """
     if scores is not None:
         assert len(texts) == len(

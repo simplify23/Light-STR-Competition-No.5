@@ -1,86 +1,33 @@
-# copyright (c) 2020 PaddlePaddle Authors. All Rights Reserve.
+#copyright (c) 2020 PaddlePaddle Authors. All Rights Reserve.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the License.
 
 import math
 import cv2
 import numpy as np
 import random
+from ppocr.utils.utility import initial_logger
+logger = initial_logger()
 
-from .text_image_aug import tia_perspective, tia_stretch, tia_distort
-
-
-class RecAug(object):
-    def __init__(self, use_tia=True, aug_prob=0.4, **kwargs):
-        self.use_tia = use_tia
-        self.aug_prob = aug_prob
-
-    def __call__(self, data):
-        img = data['image']
-        img = warp(img, 10, self.use_tia, self.aug_prob)
-        data['image'] = img
-        return data
+from .text_image_aug.augment import tia_distort, tia_stretch, tia_perspective
 
 
-class ClsResizeImg(object):
-    def __init__(self, image_shape, **kwargs):
-        self.image_shape = image_shape
-
-    def __call__(self, data):
-        img = data['image']
-        norm_img = resize_norm_img(img, self.image_shape)
-        data['image'] = norm_img
-        return data
-
-
-class RecResizeImg(object):
-    def __init__(self,
-                 image_shape,
-                 infer_mode=False,
-                 character_type='ch',
-                 **kwargs):
-        self.image_shape = image_shape
-        self.infer_mode = infer_mode
-        self.character_type = character_type
-
-    def __call__(self, data):
-        img = data['image']
-        if self.infer_mode and self.character_type == "ch":
-            norm_img = resize_norm_img_chinese(img, self.image_shape)
-        else:
-            norm_img = resize_norm_img(img, self.image_shape)
-        data['image'] = norm_img
-        return data
-
-
-class SRNRecResizeImg(object):
-    def __init__(self, image_shape, num_heads, max_text_length, **kwargs):
-        self.image_shape = image_shape
-        self.num_heads = num_heads
-        self.max_text_length = max_text_length
-
-    def __call__(self, data):
-        img = data['image']
-        norm_img = resize_norm_img_srn(img, self.image_shape)
-        data['image'] = norm_img
-        [encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1, gsrm_slf_attn_bias2] = \
-            srn_other_inputs(self.image_shape, self.num_heads, self.max_text_length)
-
-        data['encoder_word_pos'] = encoder_word_pos
-        data['gsrm_word_pos'] = gsrm_word_pos
-        data['gsrm_slf_attn_bias1'] = gsrm_slf_attn_bias1
-        data['gsrm_slf_attn_bias2'] = gsrm_slf_attn_bias2
-        return data
+def get_bounding_box_rect(pos):
+    left = min(pos[0])
+    right = max(pos[0])
+    top = min(pos[1])
+    bottom = max(pos[1])
+    return [left, top, right, bottom]
 
 
 def resize_norm_img(img, image_shape):
@@ -132,61 +79,17 @@ def resize_norm_img_chinese(img, image_shape):
     return padding_im
 
 
-def resize_norm_img_srn(img, image_shape):
-    imgC, imgH, imgW = image_shape
-
-    img_black = np.zeros((imgH, imgW))
-    im_hei = img.shape[0]
-    im_wid = img.shape[1]
-
-    if im_wid <= im_hei * 1:
-        img_new = cv2.resize(img, (imgH * 1, imgH))
-    elif im_wid <= im_hei * 2:
-        img_new = cv2.resize(img, (imgH * 2, imgH))
-    elif im_wid <= im_hei * 3:
-        img_new = cv2.resize(img, (imgH * 3, imgH))
-    else:
-        img_new = cv2.resize(img, (imgW, imgH))
-
-    img_np = np.asarray(img_new)
-    img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
-    img_black[:, 0:img_np.shape[1]] = img_np
-    img_black = img_black[:, :, np.newaxis]
-
-    row, col, c = img_black.shape
-    c = 1
-
-    return np.reshape(img_black, (c, row, col)).astype(np.float32)
-
-
-def srn_other_inputs(image_shape, num_heads, max_text_length):
-
-    imgC, imgH, imgW = image_shape
-    # mobilenet resize
-    feature_dim = int((imgH / 32) * (imgW / 4))
-    # resnet fpn
-    # feature_dim = int((imgH / 8) * (imgW / 8))
-
-    encoder_word_pos = np.array(range(0, feature_dim)).reshape(
-        (feature_dim, 1)).astype('int64')
-    gsrm_word_pos = np.array(range(0, max_text_length)).reshape(
-        (max_text_length, 1)).astype('int64')
-
-    gsrm_attn_bias_data = np.ones((1, max_text_length, max_text_length))
-    gsrm_slf_attn_bias1 = np.triu(gsrm_attn_bias_data, 1).reshape(
-        [1, max_text_length, max_text_length])
-    gsrm_slf_attn_bias1 = np.tile(gsrm_slf_attn_bias1,
-                                  [num_heads, 1, 1]) * [-1e9]
-
-    gsrm_slf_attn_bias2 = np.tril(gsrm_attn_bias_data, -1).reshape(
-        [1, max_text_length, max_text_length])
-    gsrm_slf_attn_bias2 = np.tile(gsrm_slf_attn_bias2,
-                                  [num_heads, 1, 1]) * [-1e9]
-
-    return [
-        encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1,
-        gsrm_slf_attn_bias2
-    ]
+def get_img_data(value):
+    """get_img_data"""
+    if not value:
+        return None
+    imgdata = np.frombuffer(value, dtype='uint8')
+    if imgdata is None:
+        return None
+    imgori = cv2.imdecode(imgdata, 1)
+    if imgori is None:
+        return None
+    return imgori
 
 
 def flag():
@@ -269,7 +172,7 @@ class Config:
     Config
     """
 
-    def __init__(self, use_tia):
+    def __init__(self, ):
         self.anglex = random.random() * 30
         self.angley = random.random() * 15
         self.anglez = random.random() * 10
@@ -278,7 +181,6 @@ class Config:
         self.shearx = random.random() * 0.3
         self.sheary = random.random() * 0.05
         self.borderMode = cv2.BORDER_REPLICATE
-        self.use_tia = use_tia
 
     def make(self, w, h, ang):
         """
@@ -295,9 +197,9 @@ class Config:
         self.w = w
         self.h = h
 
-        self.perspective = self.use_tia
-        self.stretch = self.use_tia
-        self.distort = self.use_tia
+        self.perspective = True
+        self.stretch = True
+        self.distort = True
 
         self.crop = True
         self.affine = False
@@ -393,28 +295,42 @@ def get_warpAffine(config):
     return rz
 
 
-def warp(img, ang, use_tia=True, prob=0.4):
+def warp(img, ang):
     """
     warp
     """
     h, w, _ = img.shape
-    config = Config(use_tia=use_tia)
+    config = Config()
     config.make(w, h, ang)
     new_img = img
+
+    prob = 0.4
 
     if config.distort:
         img_height, img_width = img.shape[0:2]
         if random.random() <= prob and img_height >= 20 and img_width >= 20:
-            new_img = tia_distort(new_img, random.randint(3, 6))
+            try:
+                new_img = tia_distort(new_img, random.randint(3, 6))
+            except:
+                logger.warning(
+                    "Exception occured during tia_distort, pass it...")
 
     if config.stretch:
         img_height, img_width = img.shape[0:2]
         if random.random() <= prob and img_height >= 20 and img_width >= 20:
-            new_img = tia_stretch(new_img, random.randint(3, 6))
+            try:
+                new_img = tia_stretch(new_img, random.randint(3, 6))
+            except:
+                logger.warning(
+                    "Exception occured during tia_stretch, pass it...")
 
     if config.perspective:
         if random.random() <= prob:
-            new_img = tia_perspective(new_img)
+            try:
+                new_img = tia_perspective(new_img)
+            except:
+                logger.warning(
+                    "Exception occured during tia_perspective, pass it...")
 
     if config.crop:
         img_height, img_width = img.shape[0:2]
@@ -436,3 +352,143 @@ def warp(img, ang, use_tia=True, prob=0.4):
         if random.random() <= prob:
             new_img = 255 - new_img
     return new_img
+
+
+def process_image(img,
+                  image_shape,
+                  label=None,
+                  char_ops=None,
+                  loss_type=None,
+                  max_text_length=None,
+                  tps=None,
+                  infer_mode=False,
+                  distort=False):
+    if distort:
+        img = warp(img, 10)
+    if infer_mode and char_ops.character_type == "ch" and not tps:
+        norm_img = resize_norm_img_chinese(img, image_shape)
+    else:
+        norm_img = resize_norm_img(img, image_shape)
+
+    norm_img = norm_img[np.newaxis, :]
+    if label is not None:
+        # char_num = char_ops.get_char_num()
+        text = char_ops.encode(label)
+        if len(text) == 0 or len(text) > max_text_length:
+            logger.info(
+                "Warning in ppocr/data/rec/img_tools.py: Wrong data type."
+                "Excepted string with length between 1 and {}, but "
+                "got '{}'. Label is '{}'".format(max_text_length,
+                                                 len(text), label))
+            return None
+        else:
+            if loss_type == "ctc":
+                text = text.reshape(-1, 1)
+                return (norm_img, text)
+            elif loss_type == "attention":
+                beg_flag_idx = char_ops.get_beg_end_flag_idx("beg")
+                end_flag_idx = char_ops.get_beg_end_flag_idx("end")
+                beg_text = np.append(beg_flag_idx, text)
+                end_text = np.append(text, end_flag_idx)
+                beg_text = beg_text.reshape(-1, 1)
+                end_text = end_text.reshape(-1, 1)
+                return (norm_img, beg_text, end_text)
+            else:
+                assert False, "Unsupport loss_type %s in process_image"\
+                    % loss_type
+    return (norm_img)
+
+
+def resize_norm_img_srn(img, image_shape):
+    imgC, imgH, imgW = image_shape
+
+    img_black = np.zeros((imgH, imgW))
+    im_hei = img.shape[0]
+    im_wid = img.shape[1]
+
+    if im_wid <= im_hei * 1:
+        img_new = cv2.resize(img, (imgH * 1, imgH))
+    elif im_wid <= im_hei * 2:
+        img_new = cv2.resize(img, (imgH * 2, imgH))
+    elif im_wid <= im_hei * 3:
+        img_new = cv2.resize(img, (imgH * 3, imgH))
+    else:
+        img_new = cv2.resize(img, (imgW, imgH))
+
+    img_np = np.asarray(img_new)
+    img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+    img_black[:, 0:img_np.shape[1]] = img_np
+    img_black = img_black[:, :, np.newaxis]
+
+    row, col, c = img_black.shape
+    c = 1
+
+    return np.reshape(img_black, (c, row, col)).astype(np.float32)
+
+
+def srn_other_inputs(image_shape, num_heads, max_text_length, char_num):
+
+    imgC, imgH, imgW = image_shape
+    feature_dim = int((imgH / 8) * (imgW / 8))
+
+    encoder_word_pos = np.array(range(0, feature_dim)).reshape(
+        (feature_dim, 1)).astype('int64')
+    gsrm_word_pos = np.array(range(0, max_text_length)).reshape(
+        (max_text_length, 1)).astype('int64')
+
+    lbl_weight = np.array([int(char_num - 1)] * max_text_length).reshape(
+        (-1, 1)).astype('int64')
+
+    gsrm_attn_bias_data = np.ones((1, max_text_length, max_text_length))
+    gsrm_slf_attn_bias1 = np.triu(gsrm_attn_bias_data, 1).reshape(
+        [-1, 1, max_text_length, max_text_length])
+    gsrm_slf_attn_bias1 = np.tile(gsrm_slf_attn_bias1,
+                                  [1, num_heads, 1, 1]) * [-1e9]
+
+    gsrm_slf_attn_bias2 = np.tril(gsrm_attn_bias_data, -1).reshape(
+        [-1, 1, max_text_length, max_text_length])
+    gsrm_slf_attn_bias2 = np.tile(gsrm_slf_attn_bias2,
+                                  [1, num_heads, 1, 1]) * [-1e9]
+
+    encoder_word_pos = encoder_word_pos[np.newaxis, :]
+    gsrm_word_pos = gsrm_word_pos[np.newaxis, :]
+
+    return [
+        lbl_weight, encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1,
+        gsrm_slf_attn_bias2
+    ]
+
+
+def process_image_srn(img,
+                      image_shape,
+                      num_heads,
+                      max_text_length,
+                      label=None,
+                      char_ops=None,
+                      loss_type=None):
+    norm_img = resize_norm_img_srn(img, image_shape)
+    norm_img = norm_img[np.newaxis, :]
+    char_num = char_ops.get_char_num()
+
+    [lbl_weight, encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1, gsrm_slf_attn_bias2] = \
+        srn_other_inputs(image_shape, num_heads, max_text_length,char_num)
+
+    if label is not None:
+        text = char_ops.encode(label)
+        if len(text) == 0 or len(text) > max_text_length:
+            return None
+        else:
+            if loss_type == "srn":
+                text_padded = [int(char_num - 1)] * max_text_length
+                for i in range(len(text)):
+                    text_padded[i] = text[i]
+                    lbl_weight[i] = [1.0]
+                text_padded = np.array(text_padded)
+                text = text_padded.reshape(-1, 1)
+                return (norm_img, text, encoder_word_pos, gsrm_word_pos,
+                        gsrm_slf_attn_bias1, gsrm_slf_attn_bias2, lbl_weight)
+            else:
+                assert False, "Unsupport loss_type %s in process_image"\
+                    % loss_type
+    return (norm_img, encoder_word_pos, gsrm_word_pos, gsrm_slf_attn_bias1,
+            gsrm_slf_attn_bias2)
