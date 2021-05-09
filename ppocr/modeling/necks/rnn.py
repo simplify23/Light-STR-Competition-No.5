@@ -18,6 +18,7 @@ from __future__ import print_function
 
 from paddle import nn
 
+from ppocr.modeling.backbones.det_mobilenet_v3 import ConvBNLayer
 from ppocr.modeling.heads.rec_ctc_head import get_para_bias_attr
 
 
@@ -69,8 +70,20 @@ class SequenceEncoder(nn.Layer):
         super(SequenceEncoder, self).__init__()
         self.encoder_reshape = Im2Seq(in_channels)
         self.out_channels = self.encoder_reshape.out_channels
+        self.encoder_type = encoder_type
         if encoder_type == 'reshape':
             self.only_reshape = True
+        elif encoder_type == 'cnn':
+            self.encoder = ConvBNLayer(
+                in_channels=in_channels,
+                out_channels=hidden_size,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                act='relu',
+                name= "downsample")
+            self.out_channels = hidden_size
+            self.only_reshape = False
         else:
             support_encoder_dict = {
                 'reshape': Im2Seq,
@@ -86,7 +99,8 @@ class SequenceEncoder(nn.Layer):
             self.only_reshape = False
 
     def forward(self, x):
-        x = self.encoder_reshape(x)
+        if self.encoder_type!= 'cnn':
+            x = self.encoder_reshape(x)
         if not self.only_reshape:
             x = self.encoder(x)
         return x
