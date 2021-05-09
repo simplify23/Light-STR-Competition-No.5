@@ -71,7 +71,9 @@ class BaseModel(nn.Layer):
     def forward(self, x, data=None):
         if self.use_transform:
             x = self.transform(x)
+        # print('before backbone:{}'.format(x.shape))
         x = self.backbone(x)
+        # print('after backbone:{}'.format(x.shape))
         if self.use_neck:
             x = self.neck(x)
         if data is None:

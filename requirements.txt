@@ -3,7 +3,7 @@ scikit-image==0.17.2
 imgaug==0.4.0
 pyclipper
 lmdb
-tqdm
+tqdmvisualdl
 numpy
 visualdl
 python-Levenshtein

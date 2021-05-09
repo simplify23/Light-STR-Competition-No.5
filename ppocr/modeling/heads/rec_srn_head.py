@@ -42,7 +42,7 @@ class PVAM(nn.Layer):
         self.num_encoder_TUs = num_encoder_tus
         self.hidden_dims = hidden_dims
         # Transformer encoder
-        t = 256
+        t = 128 #256
         c = 512
         self.wrap_encoder_for_feature = WrapEncoderForFeature(
             src_vocab_size=1,
@@ -52,7 +52,8 @@ class PVAM(nn.Layer):
             d_key=int(self.hidden_dims / self.num_heads),
             d_value=int(self.hidden_dims / self.num_heads),
             d_model=self.hidden_dims,
-            d_inner_hid=self.hidden_dims,
+            # channel mix for double 256
+            d_inner_hid=self.hidden_dims*3,
             prepostprocess_dropout=0.1,
             attention_dropout=0.1,
             relu_dropout=0.1,
@@ -72,6 +73,8 @@ class PVAM(nn.Layer):
             in_features=in_channels, out_features=1, bias_attr=False)
 
     def forward(self, inputs, encoder_word_pos, gsrm_word_pos):
+        # encoder_word_pos (b, c, 1) ex:0,1,2...255,256
+        # gsrm_word_pos    (b,max_len,1) ex:0,1,2...24
         b, c, h, w = inputs.shape
         conv_features = paddle.reshape(inputs, shape=[-1, c, h * w])
         conv_features = paddle.transpose(conv_features, perm=[0, 2, 1])
@@ -79,6 +82,7 @@ class PVAM(nn.Layer):
         b, t, c = conv_features.shape
 
         enc_inputs = [conv_features, encoder_word_pos, None]
+        # resnet(FPN)+Transformer Unit*2
         word_features = self.wrap_encoder_for_feature(enc_inputs)
 
         # pvam
@@ -122,7 +126,8 @@ class GSRM(nn.Layer):
             d_key=int(self.hidden_dims / self.num_heads),
             d_value=int(self.hidden_dims / self.num_heads),
             d_model=self.hidden_dims,
-            d_inner_hid=self.hidden_dims,
+            # channel mix for double 256
+            d_inner_hid=self.hidden_dims*3,
             prepostprocess_dropout=0.1,
             attention_dropout=0.1,
             relu_dropout=0.1,
@@ -138,7 +143,8 @@ class GSRM(nn.Layer):
             d_key=int(self.hidden_dims / self.num_heads),
             d_value=int(self.hidden_dims / self.num_heads),
             d_model=self.hidden_dims,
-            d_inner_hid=self.hidden_dims,
+            # channel mix for double
+            d_inner_hid=self.hidden_dims*3,
             prepostprocess_dropout=0.1,
             attention_dropout=0.1,
             relu_dropout=0.1,
@@ -153,6 +159,7 @@ class GSRM(nn.Layer):
     def forward(self, inputs, gsrm_word_pos, gsrm_slf_attn_bias1,
                 gsrm_slf_attn_bias2):
         # ===== GSRM Visual-to-semantic embedding block =====
+        # n-gram
         b, t, c = inputs.shape
         pvam_features = paddle.reshape(inputs, [-1, c])
         word_out = self.fc0(pvam_features)
@@ -167,6 +174,8 @@ class GSRM(nn.Layer):
         pad_idx = self.char_num
 
         word1 = paddle.cast(word_ids, "float32")
+        # 类似于class token 词首插入char_num
+        # word1往前预测，负责预测句首，解决<start>问题；word2，往后预测，负责预测句尾，解决<end>问题
         word1 = F.pad(word1, [1, 0], value=1.0 * pad_idx, data_format="NLC")
         word1 = paddle.cast(word1, "int64")
         word1 = word1[:, :-1, :]
@@ -246,7 +255,7 @@ class SRNHead(nn.Layer):
             num_encoder_tus=self.num_encoder_TUs,
             num_decoder_tus=self.num_decoder_TUs,
             hidden_dims=self.hidden_dims)
-        self.vsfd = VSFD(in_channels=in_channels, char_num=self.char_num)
+        self.vsfd = VSFD(in_channels=in_channels, char_num=self.char_num,pvam_ch=in_channels)
 
         self.gsrm.wrap_encoder1.prepare_decoder.emb0 = self.gsrm.wrap_encoder0.prepare_decoder.emb0
 
