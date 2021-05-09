@@ -45,7 +45,7 @@ class WrapEncoderForFeature(nn.Layer):
                  weight_sharing,
                  bos_idx=0):
         super(WrapEncoderForFeature, self).__init__()
-
+        t_shape = 32
         self.prepare_encoder = PrepareEncoder(
             src_vocab_size,
             d_model,
@@ -55,7 +55,7 @@ class WrapEncoderForFeature(nn.Layer):
             word_emb_param_name="src_word_emb_table")
         self.encoder = Encoder(n_layer, n_head, d_key, d_value, d_model,
                                d_inner_hid, prepostprocess_dropout,
-                               attention_dropout, relu_dropout, preprocess_cmd,
+                               attention_dropout, relu_dropout, t_shape, preprocess_cmd,
                                postprocess_cmd)
 
     def forward(self, enc_inputs):
@@ -87,7 +87,7 @@ class WrapEncoder(nn.Layer):
                  weight_sharing,
                  bos_idx=0):
         super(WrapEncoder, self).__init__()
-
+        t_shape = 25
         self.prepare_decoder = PrepareDecoder(
             src_vocab_size,
             d_model,
@@ -96,7 +96,7 @@ class WrapEncoder(nn.Layer):
             bos_idx=bos_idx)
         self.encoder = Encoder(n_layer, n_head, d_key, d_value, d_model,
                                d_inner_hid, prepostprocess_dropout,
-                               attention_dropout, relu_dropout, preprocess_cmd,
+                               attention_dropout, relu_dropout, t_shape, preprocess_cmd,
                                postprocess_cmd)
 
     def forward(self, enc_inputs):
@@ -121,11 +121,12 @@ class Encoder(nn.Layer):
                  prepostprocess_dropout,
                  attention_dropout,
                  relu_dropout,
+                 t_shape,
                  preprocess_cmd="n",
                  postprocess_cmd="da"):
 
         super(Encoder, self).__init__()
-
+        atten_method ='Mixer'
         self.encoder_layers = list()
         for i in range(n_layer):
             self.encoder_layers.append(
@@ -133,7 +134,7 @@ class Encoder(nn.Layer):
                     "layer_%d" % i,
                     EncoderLayer(n_head, d_key, d_value, d_model, d_inner_hid,
                                  prepostprocess_dropout, attention_dropout,
-                                 relu_dropout, preprocess_cmd,
+                                 relu_dropout,  t_shape,atten_method, preprocess_cmd,
                                  postprocess_cmd)))
         self.processer = PrePostProcessLayer(preprocess_cmd, d_model,
                                              prepostprocess_dropout)
@@ -160,14 +161,21 @@ class EncoderLayer(nn.Layer):
                  prepostprocess_dropout,
                  attention_dropout,
                  relu_dropout,
+                 t_shape,
+                 atten_method = 'MHA',
                  preprocess_cmd="n",
                  postprocess_cmd="da"):
 
         super(EncoderLayer, self).__init__()
+        self.atten_method = atten_method
         self.preprocesser1 = PrePostProcessLayer(preprocess_cmd, d_model,
                                                  prepostprocess_dropout)
-        self.self_attn = MultiHeadAttention(d_key, d_value, d_model, n_head,
+        if atten_method == 'MHA':
+            self.self_attn = MultiHeadAttention(d_key, d_value, d_model, n_head,
                                             attention_dropout)
+        elif atten_method == 'Mixer':
+            # 32 is w*h
+            self.self_attn = MixerBlock(t_shape*4, t_shape, relu_dropout)
         self.postprocesser1 = PrePostProcessLayer(postprocess_cmd, d_model,
                                                   prepostprocess_dropout)
 
@@ -178,8 +186,11 @@ class EncoderLayer(nn.Layer):
                                                   prepostprocess_dropout)
 
     def forward(self, enc_input, attn_bias):
-        attn_output = self.self_attn(
-            self.preprocesser1(enc_input), None, None, attn_bias)
+        input = self.preprocesser1(enc_input)
+        if self.atten_method=='MHA':
+            attn_output = self.self_attn(input, None, None, attn_bias)
+        elif self.atten_method=='Mixer':
+            attn_output = self.self_attn(input)
         attn_output = self.postprocesser1(attn_output, enc_input)
         ffn_output = self.ffn(self.preprocesser2(attn_output))
         ffn_output = self.postprocesser2(ffn_output, attn_output)
@@ -404,3 +415,26 @@ class FFN(nn.Layer):
                 hidden, p=self.dropout_rate, mode="downscale_in_infer")
         out = self.fc2(hidden)
         return out
+
+class MixerBlock(nn.Layer):
+    def __init__(self, d_inner_hid, d_model, dropout_rate):
+        super(MixerBlock, self).__init__()
+        self.dropout_rate = dropout_rate
+        self.act = paddle.nn.GELU()
+        self.fc1 = paddle.nn.Linear(
+            in_features=d_model, out_features=d_inner_hid)
+        self.fc2 = paddle.nn.Linear(
+            in_features=d_inner_hid, out_features=d_model)
+
+    def forward(self, x):
+        # x: b w*h c
+        x = paddle.transpose(x, perm=[0, 2, 1])
+        hidden = self.fc1(x)
+        hidden = self.act(hidden)
+        if self.dropout_rate:
+            hidden = F.dropout(
+                hidden, p=self.dropout_rate, mode="downscale_in_infer")
+        out = self.fc2(hidden)
+        out = paddle.transpose(out, perm=[0, 2, 1])
+        return out
+
