@@ -29,7 +29,7 @@ class SimpleDataSet(Dataset):
         dataset_config = config[mode]['dataset']
         loader_config = config[mode]['loader']
 
-        self.delimiter = dataset_config.get('delimiter', ' ') #\t
+        self.delimiter = dataset_config.get('delimiter', '\t') #\t
         label_file_list = dataset_config.pop('label_file_list')
         data_source_num = len(label_file_list)
         ratio_list = dataset_config.get("ratio_list", [1.0])
@@ -40,11 +40,11 @@ class SimpleDataSet(Dataset):
             ratio_list
         ) == data_source_num, "The length of ratio_list should be the same as the file_list."
 
-        self.data_dir = dataset_config['data_dir']
-        # self.data_dir =''
-        # list_label_file = label_file_list[0].split('/')
-        # for i in range(len(list_label_file)-1):
-        #     self.data_dir+='/'+list_label_file[i] if i !=0 else list_label_file[i]
+        # self.data_dir = dataset_config['data_dir']
+        self.data_dir =''
+        list_label_file = label_file_list[0].split('/')
+        for i in range(len(list_label_file)-1):
+            self.data_dir+='/'+list_label_file[i] if i !=0 else list_label_file[i]
 
         self.do_shuffle = loader_config['shuffle']
 
