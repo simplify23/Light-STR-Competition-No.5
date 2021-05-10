@@ -69,7 +69,9 @@ Train:
       - DecodeImage: # load image
           img_mode: BGR
           channel_first: False
-      - RecAug: 
+      - RecAug:
+          use_tia: True
+          aug_prob: 0.4
       - CTCLabelEncode: # Class handling label
       - RecResizeImg:
           image_shape: [3, 32, 320]
@@ -85,7 +87,7 @@ Eval:
   dataset:
     name: SimpleDataSet
     data_dir: ./train_data
-    label_file_list: ["./train_data/val_list.txt"]
+    label_file_list: ["./train_data/ppdataset/train/labeltrain.txt"]
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
