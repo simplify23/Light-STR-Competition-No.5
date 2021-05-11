@@ -1,137 +1,129 @@
-English | [简体中文](README_ch.md)
+[English](README.md) | 简体中文
 
-## Introduction
-PaddleOCR aims to create multilingual, awesome, leading, and practical OCR tools that help users train better models and apply them into practice.
+## 简介
+PaddleOCR旨在打造一套丰富、领先、且实用的OCR工具库，助力使用者训练出更好的模型，并应用落地。
 
-## Notice
-PaddleOCR supports both dynamic graph and static graph programming paradigm
-- Dynamic graph: release/2.1 (default), **supported by paddle 2.0.0 ([installation](./doc/doc_en/installation_en.md))**
-- Static graph: develop branch
+## 文档教程
+- [快速安装](./doc/doc_ch/installation.md)
+- [中文OCR模型快速使用](./doc/doc_ch/quickstart.md)
+- [多语言OCR模型快速使用](./doc/doc_ch/multi_languages.md)
+- [代码组织结构](./doc/doc_ch/tree.md)
+- 算法介绍
+  - [文本检测](./doc/doc_ch/algorithm_overview.md)
+  - [文本识别](./doc/doc_ch/algorithm_overview.md)
+  - [PP-OCR Pipeline](#PP-OCR)
+  - [端到端PGNet算法](./doc/doc_ch/pgnet.md)
+- 模型训练/评估
+  - [文本检测](./doc/doc_ch/detection.md)
+  - [文本识别](./doc/doc_ch/recognition.md)
+  - [方向分类器](./doc/doc_ch/angle_class.md)
+  - [yml参数配置文件介绍](./doc/doc_ch/config.md)
+- 预测部署
+  - [基于pip安装whl包快速推理](./doc/doc_ch/whl.md)
+  - [基于Python脚本预测引擎推理](./doc/doc_ch/inference.md)
+  - [基于C++预测引擎推理](./deploy/cpp_infer/readme.md)
+  - [服务化部署](./deploy/hubserving/readme.md)
+  - [端侧部署](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/deploy/lite/readme.md)
+  - [Benchmark](./doc/doc_ch/benchmark.md)
+- 数据集
+  - [通用中英文OCR数据集](./doc/doc_ch/datasets.md)
+  - [手写中文OCR数据集](./doc/doc_ch/handwritten_datasets.md)
+  - [垂类多语言OCR数据集](./doc/doc_ch/vertical_and_multilingual_datasets.md)
+- 数据标注与合成
+  - [半自动标注工具PPOCRLabel](./PPOCRLabel/README_ch.md)
+  - [数据合成工具Style-Text](./StyleText/README_ch.md)
+  - [其它数据标注工具](./doc/doc_ch/data_annotation.md)
+  - [其它数据合成工具](./doc/doc_ch/data_synthesis.md)
+- [效果展示](#效果展示)
+- FAQ
+  - [【精选】OCR精选10个问题](./doc/doc_ch/FAQ.md)
+  - [【理论篇】OCR通用41个问题](./doc/doc_ch/FAQ.md)
+  - [【实战篇】PaddleOCR实战147个问题](./doc/doc_ch/FAQ.md)
+- [技术交流群](#欢迎加入PaddleOCR技术交流群)
+- [参考文献](./doc/doc_ch/reference.md)
+- [许可证书](#许可证书)
+- [贡献代码](#贡献代码)
 
-**Recent updates**
-- 2021.4.8 Release PaddleOCRv2.1(branch release/2.1). Newly released AAAI 2021 end-to-end algorithm [PGNet](./doc/doc_en/pgnet_en.md) and [Multi language recognition model](./doc/doc_en/multi_languages_en.md), support more than 80 languages recognition.
-- 2021.2.8 Release PaddleOCRv2.0 (branch release/2.0). Refer to [release note](https://github.com/PaddlePaddle/PaddleOCR/releases/tag/v2.0.0) for more details.
-- 2021.1.21 update more than 25+ multilingual recognition models [models list](./doc/doc_en/models_list_en.md), including：English, Chinese, German, French, Japanese，Spanish，Portuguese Russia Arabic and so on.  Models for more languages will continue to be updated [Develop Plan](https://github.com/PaddlePaddle/PaddleOCR/issues/1048).
-- 2020.12.15 update Data synthesis tool, i.e., [Style-Text](./StyleText/README.md)，easy to synthesize a large number of images which are similar to the target scene image.
-- 2020.11.25 Update a new data annotation tool, i.e., [PPOCRLabel](./PPOCRLabel/README.md), which is helpful to improve the labeling efficiency. Moreover, the labeling results can be used in training of the PP-OCR system directly.
-- [more](./doc/doc_en/update_en.md)
+## 注意
+PaddleOCR同时支持动态图与静态图两种编程范式
+- 动态图版本：release/2.1（默认分支，开发分支为dygraph分支），需将paddle版本升级至2.0.0（[快速安装](./doc/doc_ch/installation.md)）
+- 静态图版本：develop分支
 
-## Features
-- PPOCR series of high-quality pre-trained models, comparable to commercial effects
-    - Ultra lightweight ppocr_mobile series models: detection (3.0M) + direction classifier (1.4M) + recognition (5.0M) = 9.4M
-    - General ppocr_server series models: detection (47.1M) + direction classifier (1.4M) + recognition (94.9M) = 143.4M
-    - Support Chinese, English, and digit recognition, vertical text recognition, and long text recognition
-    - Support more than 80 kinds of multi-language recognition models: [For details](./doc/doc_en/multi_languages_en.md)
-- Rich toolkits related to the OCR areas
-    - Semi-automatic data annotation tool, i.e., PPOCRLabel: support fast and efficient data annotation
-    - Data synthesis tool, i.e., Style-Text: easy to synthesize a large number of images which are similar to the target scene image
-- Support user-defined training, provides rich predictive inference deployment solutions
-- Support PIP installation, easy to use
-- Support Linux, Windows, MacOS and other systems
+**近期更新**
+- 2021.4.26 [FAQ](./doc/doc_ch/FAQ.md)新增5个高频问题，总数213个，每周一都会更新，欢迎大家持续关注。
+- PaddleOCR研发团队对最新发版内容技术深入解读，4月13日晚上19:00，[直播地址](https://live.bilibili.com/21689802)。
+- 2021.4.8 release 2.1版本，新增AAAI 2021论文[端到端识别算法PGNet](./doc/doc_ch/pgnet.md)开源，[多语言模型](./doc/doc_ch/multi_languages.md)支持种类增加到80+。
+- 2021.2.8 正式发布PaddleOCRv2.0(branch release/2.0)并设置为推荐用户使用的默认分支. 发布的详细内容，请参考: https://github.com/PaddlePaddle/PaddleOCR/releases/tag/v2.0.0
+- 2021.1.26,28,29 PaddleOCR官方研发团队带来技术深入解读三日直播课，1月26日、28日、29日晚上19:30，[直播地址](https://live.bilibili.com/21689802)
+- [More](./doc/doc_ch/update.md)
 
-## Visualization
+
+
+## 特性
+
+- PPOCR系列高质量预训练模型，准确的识别效果
+    - 超轻量ppocr_mobile移动端系列：检测（3.0M）+方向分类器（1.4M）+ 识别（5.0M）= 9.4M
+    - 通用ppocr_server系列：检测（47.1M）+方向分类器（1.4M）+ 识别（94.9M）= 143.4M
+    - 支持中英文数字组合识别、竖排文本识别、长文本识别
+    - 支持80+多语言识别，详见[多语言模型](./doc/doc_ch/multi_languages.md)
+- 丰富易用的OCR相关工具组件
+    - 半自动数据标注工具PPOCRLabel：支持快速高效的数据标注
+    - 数据合成工具Style-Text：批量合成大量与目标场景类似的图像
+- 支持用户自定义训练，提供丰富的预测推理部署方案
+- 支持PIP快速安装使用
+- 可运行于Linux、Windows、MacOS等多种系统
+
+## 效果展示
 
 <div align="center">
     <img src="doc/imgs_results/ch_ppocr_mobile_v2.0/test_add_91.jpg" width="800">
-    <img src="doc/imgs_results/multi_lang/img_01.jpg" width="800">
-    <img src="doc/imgs_results/multi_lang/img_02.jpg" width="800">
+    <img src="doc/imgs_results/ch_ppocr_mobile_v2.0/00018069.jpg" width="800">
 </div>
 
-The above pictures are the visualizations of the English recognition model. For more details, please see [Multi language recognition model](./doc/doc_en/multi_languages_en.md)
+上图是通用ppocr_server模型效果展示，更多效果图请见[效果展示页面](./doc/doc_ch/visualization.md)。
 
-<a name="Community"></a>
-## Community
-- Scan the QR code below with your Wechat, you can access to official technical exchange group. Look forward to your participation.
+<a name="欢迎加入PaddleOCR技术交流群"></a>
+## 欢迎加入PaddleOCR技术交流群
+- 微信扫描二维码加入官方交流群，获得更高效的问题答疑，与各行各业开发者充分交流，期待您的加入。
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/dygraph/doc/joinus.PNG"  width = "200" height = "200" />
 </div>
 
+## 快速体验
+- PC端：超轻量级中文OCR在线体验地址：https://www.paddlepaddle.org.cn/hub/scene/ocr
 
-## Quick Experience
+- 移动端：[安装包DEMO下载地址](https://ai.baidu.com/easyedge/app/openSource?from=paddlelite)(基于EasyEdge和Paddle-Lite, 支持iOS和Android系统)，Android手机也可以直接扫描下面二维码安装体验。
 
-You can also quickly experience the ultra-lightweight OCR : [Online Experience](https://www.paddlepaddle.org.cn/hub/scene/ocr)
-
-Mobile DEMO experience (based on EasyEdge and Paddle-Lite, supports iOS and Android systems): [Sign in to the website to obtain the QR code for  installing the App](https://ai.baidu.com/easyedge/app/openSource?from=paddlelite)
-
- Also, you can scan the QR code below to install the App (**Android support only**)
 
 <div align="center">
 <img src="./doc/ocr-android-easyedge.png"  width = "200" height = "200" />
 </div>
 
-- [**OCR Quick Start**](./doc/doc_en/quickstart_en.md)
+- 代码体验：从[快速安装](./doc/doc_ch/quickstart.md) 开始
 
-<a name="Supported-Chinese-model-list"></a>
+<a name="模型下载"></a>
+## PP-OCR 2.0系列模型列表（更新中）
+**说明** ：2.0版模型和[1.1版模型](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/doc/doc_ch/models_list.md)的主要区别在于动态图训练vs.静态图训练，模型性能上无明显差距。
+| 模型简介     | 模型名称     |推荐场景          | 检测模型 | 方向分类器 | 识别模型 |
+| ------------ | --------------- | ----------------|---- | ---------- | -------- |
+| 中英文超轻量OCR模型（9.4M） | ch_ppocr_mobile_v2.0_xx |移动端&服务器端|[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_train.tar)|[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_train.tar) |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_pre.tar)      |
+| 中英文通用OCR模型（143.4M）   |ch_ppocr_server_v2.0_xx|服务器端 |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_train.tar)    |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_train.tar)    |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_pre.tar)  |  
 
-
-## PP-OCR 2.0 series model list（Update on Dec 15）
-**Note** : Compared with [models 1.1](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/doc/doc_en/models_list_en.md), which are trained with static graph programming paradigm, models 2.0 are the dynamic graph trained version and achieve close performance.
-
-| Model introduction                                           | Model name                   | Recommended scene | Detection model                                              | Direction classifier                                         | Recognition model                                            |
-| ------------------------------------------------------------ | ---------------------------- | ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Chinese and English ultra-lightweight OCR model (9.4M)       | ch_ppocr_mobile_v2.0_xx      | Mobile & server   |[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_train.tar)|[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_train.tar) |[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_pre.tar)      |
-| Chinese and English general OCR model (143.4M)               | ch_ppocr_server_v2.0_xx      | Server            |[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_train.tar)    |[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_traingit.tar)    |[inference model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_infer.tar) / [pre-trained model](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_pre.tar)  |  
-
-
-For more model downloads (including multiple languages), please refer to [PP-OCR v2.0 series model downloads](./doc/doc_en/models_list_en.md).
-
-For a new language request, please refer to [Guideline for new language_requests](#language_requests).
-
-## Tutorials
-- [Installation](./doc/doc_en/installation_en.md)
-- [Chinese OCR Quick Start](./doc/doc_en/quickstart_en.md)
-- [Multi-language OCR Quick Start](./doc/doc_en/multi_languages_en.md)
-- [Code Structure](./doc/doc_en/tree_en.md)
-- Algorithm Introduction
-    - [Text Detection Algorithm](./doc/doc_en/algorithm_overview_en.md)
-    - [Text Recognition Algorithm](./doc/doc_en/algorithm_overview_en.md)
-    - [PP-OCR Pipeline](#PP-OCR-Pipeline)
-    - [End2End Algorithm *PGNet*](./doc/doc_en/pgnet_en.md)
-- Model Training/Evaluation
-    - [Text Detection](./doc/doc_en/detection_en.md)
-    - [Text Recognition](./doc/doc_en/recognition_en.md)
-    - [Direction Classification](./doc/doc_en/angle_class_en.md)
-    - [Yml Configuration](./doc/doc_en/config_en.md)
-- Inference and Deployment
-    - [Quick Inference Based on PIP](./doc/doc_en/whl_en.md)
-    - [Python Inference](./doc/doc_en/inference_en.md)
-    - [C++ Inference](./deploy/cpp_infer/readme_en.md)
-    - [Serving](./deploy/hubserving/readme_en.md)
-    - [Mobile](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/deploy/lite/readme_en.md)
-    - [Benchmark](./doc/doc_en/benchmark_en.md)  
-- Data Annotation and Synthesis
-    - [Semi-automatic Annotation Tool: PPOCRLabel](./PPOCRLabel/README.md)
-    - [Data Synthesis Tool: Style-Text](./StyleText/README.md)
-    - [Other Data Annotation Tools](./doc/doc_en/data_annotation_en.md)
-    - [Other Data Synthesis Tools](./doc/doc_en/data_synthesis_en.md)
-- Datasets
-    - [General OCR Datasets(Chinese/English)](./doc/doc_en/datasets_en.md)
-    - [HandWritten_OCR_Datasets(Chinese)](./doc/doc_en/handwritten_datasets_en.md)
-    - [Various OCR Datasets(multilingual)](./doc/doc_en/vertical_and_multilingual_datasets_en.md)
-- [Visualization](#Visualization)
-- [New language requests](#language_requests)
-- [FAQ](./doc/doc_en/FAQ_en.md)
-- [Community](#Community)
-- [References](./doc/doc_en/reference_en.md)
-- [License](#LICENSE)
-- [Contribution](#CONTRIBUTION)
+更多模型下载（包括多语言），可以参考[PP-OCR v2.0 系列模型下载](./doc/doc_ch/models_list.md)
 
 
-
-<a name="PP-OCR-Pipeline"></a>
-
+<a name="PP-OCR"></a>
 ## PP-OCR Pipeline
-
 <div align="center">
     <img src="./doc/ppocr_framework.png" width="800">
 </div>
 
-PP-OCR is a practical ultra-lightweight OCR system. It is mainly composed of three parts: DB text detection[2], detection frame correction and CRNN text recognition[7]. The system adopts 19 effective strategies from 8 aspects including backbone network selection and adjustment, prediction head design, data augmentation, learning rate transformation strategy, regularization parameter selection, pre-training model use, and automatic model tailoring and quantization to optimize and slim down the models of each module. The final results are an ultra-lightweight Chinese and English OCR model with an overall size of 3.5M and a 2.8M English digital OCR model. For more details, please refer to the PP-OCR technical article (https://arxiv.org/abs/2009.09941). Besides, The implementation of the FPGM Pruner [8] and PACT quantization [9] is based on [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim).
+PP-OCR是一个实用的超轻量OCR系统。主要由DB文本检测[2]、检测框矫正和CRNN文本识别三部分组成[7]。该系统从骨干网络选择和调整、预测头部的设计、数据增强、学习率变换策略、正则化参数选择、预训练模型使用以及模型自动裁剪量化8个方面，采用19个有效策略，对各个模块的模型进行效果调优和瘦身，最终得到整体大小为3.5M的超轻量中英文OCR和2.8M的英文数字OCR。更多细节请参考PP-OCR技术方案 https://arxiv.org/abs/2009.09941 。其中FPGM裁剪器[8]和PACT量化[9]的实现可以参考[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)。
 
-
-## Visualization [more](./doc/doc_en/visualization_en.md)
-- Chinese OCR model
+<a name="效果展示"></a>
+## 效果展示 [more](./doc/doc_ch/visualization.md)
+- 中文模型
 <div align="center">
     <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/test_add_91.jpg" width="800">
     <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/00015504.jpg" width="800">
@@ -139,52 +131,34 @@ PP-OCR is a practical ultra-lightweight OCR system. It is mainly composed of thr
     <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/rotate_00052204.jpg" width="800">
 </div>
 
-- English OCR model
+- 英文模型
 <div align="center">
     <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/img_12.jpg" width="800">
 </div>
 
-- Multilingual OCR model
+- 其他语言模型
 <div align="center">
     <img src="./doc/imgs_results/french_0.jpg" width="800">
     <img src="./doc/imgs_results/korean.jpg" width="800">
 </div>
 
 
-<a name="language_requests"></a>
-## Guideline for new language requests
+<a name="许可证书"></a>
+## 许可证书
+本项目的发布受<a href="https://github.com/PaddlePaddle/PaddleOCR/blob/master/LICENSE">Apache 2.0 license</a>许可认证。
 
-If you want to request a new language support, a PR with 2 following files are needed：
-
-1. In folder [ppocr/utils/dict](./ppocr/utils/dict),
-it is necessary to submit the dict text to this path and name it with `{language}_dict.txt` that contains a list of all characters. Please see the format example from other files in that folder.
-
-2. In folder [ppocr/utils/corpus](./ppocr/utils/corpus),
-it is necessary to submit the corpus to this path and name it with `{language}_corpus.txt` that contains a list of words in your language.
-Maybe, 50000 words per language is necessary at least.
-Of course, the more, the better.
-
-If your language has unique elements, please tell me in advance within any way, such as useful links, wikipedia and so on.
-
-More details, please refer to [Multilingual OCR Development Plan](https://github.com/PaddlePaddle/PaddleOCR/issues/1048).
+<a name="贡献代码"></a>
+## 贡献代码
+我们非常欢迎你为PaddleOCR贡献代码，也十分感谢你的反馈。
 
 
-<a name="LICENSE"></a>
-## License
-This project is released under <a href="https://github.com/PaddlePaddle/PaddleOCR/blob/master/LICENSE">Apache 2.0 license</a>
-
-<a name="CONTRIBUTION"></a>
-## Contribution
-We welcome all the contributions to PaddleOCR and appreciate for your feedback very much.
-
-- Many thanks to [Khanh Tran](https://github.com/xxxpsyduck) and [Karl Horky](https://github.com/karlhorky) for contributing and revising the English documentation.
-- Many thanks to [zhangxin](https://github.com/ZhangXinNan) for contributing the new visualize function、add .gitignore and discard set PYTHONPATH manually.
-- Many thanks to [lyl120117](https://github.com/lyl120117) for contributing the code for printing the network structure.
-- Thanks [xiangyubo](https://github.com/xiangyubo) for contributing the handwritten Chinese OCR datasets.
-- Thanks [authorfu](https://github.com/authorfu) for contributing Android demo  and [xiadeye](https://github.com/xiadeye) contributing iOS demo, respectively.
-- Thanks [BeyondYourself](https://github.com/BeyondYourself) for contributing many great suggestions and simplifying part of the code style.
-- Thanks [tangmq](https://gitee.com/tangmq) for contributing Dockerized deployment services to PaddleOCR and supporting the rapid release of callable Restful API services.
-- Thanks [lijinhan](https://github.com/lijinhan) for contributing a new way, i.e., java SpringBoot, to achieve the request for the Hubserving deployment.
-- Thanks [Mejans](https://github.com/Mejans) for contributing the Occitan corpus and character set.
-- Thanks [LKKlein](https://github.com/LKKlein) for contributing a new deploying package with the Golang program language.
-- Thanks [Evezerest](https://github.com/Evezerest), [ninetailskim](https://github.com/ninetailskim), [edencfc](https://github.com/edencfc), [BeyondYourself](https://github.com/BeyondYourself) and [1084667371](https://github.com/1084667371) for contributing a new data annotation tool, i.e., PPOCRLabel。
+- 非常感谢 [Khanh Tran](https://github.com/xxxpsyduck) 和 [Karl Horky](https://github.com/karlhorky) 贡献修改英文文档
+- 非常感谢 [zhangxin](https://github.com/ZhangXinNan)([Blog](https://blog.csdn.net/sdlypyzq)) 贡献新的可视化方式、添加.gitignore、处理手动设置PYTHONPATH环境变量的问题
+- 非常感谢 [lyl120117](https://github.com/lyl120117) 贡献打印网络结构的代码
+- 非常感谢 [xiangyubo](https://github.com/xiangyubo) 贡献手写中文OCR数据集
+- 非常感谢 [authorfu](https://github.com/authorfu) 贡献Android和[xiadeye](https://github.com/xiadeye) 贡献IOS的demo代码
+- 非常感谢 [BeyondYourself](https://github.com/BeyondYourself) 给PaddleOCR提了很多非常棒的建议，并简化了PaddleOCR的部分代码风格。
+- 非常感谢 [tangmq](https://gitee.com/tangmq) 给PaddleOCR增加Docker化部署服务，支持快速发布可调用的Restful API服务。
+- 非常感谢 [lijinhan](https://github.com/lijinhan) 给PaddleOCR增加java SpringBoot 调用OCR Hubserving接口完成对OCR服务化部署的使用。
+- 非常感谢 [Mejans](https://github.com/Mejans) 给PaddleOCR增加新语言奥克西坦语Occitan的字典和语料。
+- 非常感谢 [Evezerest](https://github.com/Evezerest)， [ninetailskim](https://github.com/ninetailskim)， [edencfc](https://github.com/edencfc)， [BeyondYourself](https://github.com/BeyondYourself)， [1084667371](https://github.com/1084667371) 贡献了PPOCRLabel的完整代码。

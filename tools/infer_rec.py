@@ -110,8 +110,10 @@ def main():
             for rec_reuslt in post_result:
                 logger.info('\t result: {}'.format(rec_reuslt))
                 if len(rec_reuslt) >= 2:
-                    fout.write(file + "\t" + rec_reuslt[0] + "\t" + str(
-                        rec_reuslt[1]) + "\n")
+                    # fout.write(file + "\t" + rec_reuslt[0] + "\t" + str(
+                    #     rec_reuslt[1]) + "\n")
+                    file = file.split("/")[-1]
+                    fout.write(file + "\t" + rec_reuslt[0] + "\n")
     logger.info("success!")
 
 

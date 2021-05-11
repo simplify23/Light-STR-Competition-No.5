@@ -1,2 +1,3 @@
 # recommended paddle.__version__ == 2.0.0
-python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '4,5,6,7'  tools/train.py -c configs/rec/ztl_origin.yml
+python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '3,4,5,6,7'  tools/train.py -c configs/rec/pp_chinese_ztl_baseline.yml
+python3 tools/infer_rec.py -c configs/rec/pp_chinese_ztl_baseline.yml -o Global.pretrained_model=output/rec/pp_ocr_ztl_baseline/best_accuracy Global.load_static_weights=false Global.infer_img=train_data/ppdataset/test/testimages
