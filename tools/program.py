@@ -191,15 +191,16 @@ def train(config,
             "During the training process, after the {}th iteration, an evaluation is run every {} iterations".
             format(start_eval_step, eval_batch_step))
 
-    total_param = count_param(model,name = 'total')
-    backbone_param = count_param(model.backbone,name = 'backbone')
-    head_param = count_param(model.head,name = 'head')
-    neck_param = count_param(model.neck, name = 'neck')
+    if dist.get_rank() == 0:
+        total_param = count_param(model,name = 'total')
+        backbone_param = count_param(model._layers.backbone,name = 'backbone')
+        head_param = count_param(model._layers.head,name = 'head')
+        neck_param = count_param(model._layers.neck, name = 'neck')
 
-    logger.info(total_param)
-    logger.info(backbone_param)
-    logger.info(head_param)
-    logger.info(neck_param)
+        logger.info(total_param)
+        logger.info(backbone_param)
+        logger.info(head_param)
+        logger.info(neck_param)
 
     save_epoch_step = config['Global']['save_epoch_step']
     save_model_dir = config['Global']['save_model_dir']
