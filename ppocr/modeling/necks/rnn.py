@@ -36,11 +36,11 @@ class Im2Seq(nn.Layer):
 
 
 class EncoderWithRNN(nn.Layer):
-    def __init__(self, in_channels, hidden_size):
+    def __init__(self, in_channels, hidden_size,num_layers = 2):
         super(EncoderWithRNN, self).__init__()
         self.out_channels = hidden_size * 2
         self.lstm = nn.LSTM(
-            in_channels, hidden_size, direction='bidirectional', num_layers=2)
+            in_channels, hidden_size, direction='bidirectional', num_layers=num_layers)
 
     def forward(self, x):
         x, _ = self.lstm(x)

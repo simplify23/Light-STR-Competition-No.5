@@ -192,15 +192,16 @@ def train(config,
             format(start_eval_step, eval_batch_step))
 
     if dist.get_rank() == 0:
+        print(model)
         total_param = count_param(model,name = 'total')
-        backbone_param = count_param(model._layers.backbone,name = 'backbone')
-        head_param = count_param(model._layers.head,name = 'head')
-        neck_param = count_param(model._layers.neck, name = 'neck')
+        # backbone_param = count_param(model._layers.backbone,name = 'backbone')
+        # head_param = count_param(model._layers.head,name = 'head')
+        # neck_param = count_param(model._layers.neck, name = 'neck')
 
         logger.info(total_param)
-        logger.info(backbone_param)
-        logger.info(head_param)
-        logger.info(neck_param)
+        # logger.info(backbone_param)
+        # logger.info(head_param)
+        # logger.info(neck_param)
 
     save_epoch_step = config['Global']['save_epoch_step']
     save_model_dir = config['Global']['save_model_dir']
@@ -444,7 +445,8 @@ def preprocess(is_train=False):
         vdl_writer = LogWriter(logdir=vdl_writer_path)
     else:
         vdl_writer = None
-    print_dict(config, logger)
+    if dist.get_rank() == 0:
+        print_dict(config, logger)
     logger.info('train with paddle {} and device {}'.format(paddle.__version__,
                                                             device))
     return config, device, logger, vdl_writer
