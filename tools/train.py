@@ -26,6 +26,7 @@ sys.path.append(os.path.abspath(os.path.join(__dir__, '..')))
 import yaml
 import paddle
 import paddle.distributed as dist
+from paddle.jit import to_static
 
 paddle.seed(2)
 
@@ -96,11 +97,26 @@ def main(config, device, logger, vdl_writer):
     if valid_dataloader is not None:
         logger.info('valid dataloader has {} iters'.format(
             len(valid_dataloader)))
-    # start train
-    program.train(config, train_dataloader, valid_dataloader, device, model,
-                  loss_class, optimizer, lr_scheduler, post_process_class,
-                  eval_class, pre_best_model_dict, logger, vdl_writer)
 
+    test = False
+    if test == True:
+        test_model(model)
+    else:
+    # # start train
+        program.train(config, train_dataloader, valid_dataloader, device, model,
+                      loss_class, optimizer, lr_scheduler, post_process_class,
+                      eval_class, pre_best_model_dict, logger, vdl_writer)
+
+def test_model(model):
+    save_path = './inference/ztl_test/ctc_test'
+    model = to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(
+                shape=[None,3,32,320], dtype='float32')
+        ])
+    print(model)
+    paddle.jit.save(model, save_path)
 
 def test_reader(config, device, logger):
     loader = build_dataloader(config, 'Train', device, logger)

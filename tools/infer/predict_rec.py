@@ -25,6 +25,7 @@ import numpy as np
 import math
 import time
 import traceback
+import os
 import paddle
 
 import tools.infer.utility as utility
@@ -34,7 +35,8 @@ from ppocr.utils.utility import get_image_file_list, check_and_read_gif
 
 logger = get_logger()
 
-
+def cut_path_file(path):
+    return path.split('/')[-1]
 class TextRecognizer(object):
     def __init__(self, args):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
@@ -42,6 +44,7 @@ class TextRecognizer(object):
         self.rec_batch_num = args.rec_batch_num
         self.rec_algorithm = args.rec_algorithm
         self.max_text_length = args.max_text_length
+        self.save_path = args.rec_save_path
         postprocess_params = {
             'name': 'CTCLabelDecode',
             "character_type": args.rec_char_type,
@@ -254,36 +257,38 @@ def main(args):
     total_images_num = 0
     valid_image_file_list = []
     img_list = []
-    for idx, image_file in enumerate(image_file_list):
-        img, flag = check_and_read_gif(image_file)
-        if not flag:
-            img = cv2.imread(image_file)
-        if img is None:
-            logger.info("error in loading image:{}".format(image_file))
-            continue
-        valid_image_file_list.append(image_file)
-        img_list.append(img)
-        if len(img_list) >= args.rec_batch_num or idx == len(
-                image_file_list) - 1:
-            try:
-                rec_res, predict_time = text_recognizer(img_list)
-                total_run_time += predict_time
-            except:
-                logger.info(traceback.format_exc())
-                logger.info(
-                    "ERROR!!!! \n"
-                    "Please read the FAQ：https://github.com/PaddlePaddle/PaddleOCR#faq \n"
-                    "If your model has tps module:  "
-                    "TPS does not support variable shape.\n"
-                    "Please set --rec_image_shape='3,32,100' and --rec_char_type='en' "
-                )
-                exit()
-            for ino in range(len(img_list)):
-                logger.info("Predicts of {}:{}".format(valid_image_file_list[
-                    ino], rec_res[ino]))
-            total_images_num += len(valid_image_file_list)
-            valid_image_file_list = []
-            img_list = []
+    with open(args.rec_save_path, "w") as fout:
+        for idx, image_file in enumerate(image_file_list):
+            img, flag = check_and_read_gif(image_file)
+            if not flag:
+                img = cv2.imread(image_file)
+            if img is None:
+                logger.info("error in loading image:{}".format(image_file))
+                continue
+            valid_image_file_list.append(image_file)
+            img_list.append(img)
+            if len(img_list) >= args.rec_batch_num or idx == len(
+                    image_file_list) - 1:
+                try:
+                    rec_res, predict_time = text_recognizer(img_list)
+                    total_run_time += predict_time
+                except:
+                    logger.info(traceback.format_exc())
+                    logger.info(
+                        "ERROR!!!! \n"
+                        "Please read the FAQ：https://github.com/PaddlePaddle/PaddleOCR#faq \n"
+                        "If your model has tps module:  "
+                        "TPS does not support variable shape.\n"
+                        "Please set --rec_image_shape='3,32,100' and --rec_char_type='en' "
+                    )
+                    exit()
+                for ino in range(len(img_list)):
+                    logger.info("Predicts of {}:{}".format(valid_image_file_list[
+                        ino], rec_res[ino]))
+                    fout.write(cut_path_file(valid_image_file_list[ino]) + "\t" + rec_res[ino][0] + "\n")
+                total_images_num += len(valid_image_file_list)
+                valid_image_file_list = []
+                img_list = []
     logger.info("Total predict time for {} images, cost: {:.3f}".format(
         total_images_num, total_run_time))
 
