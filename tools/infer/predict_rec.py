@@ -37,6 +37,31 @@ logger = get_logger()
 
 def cut_path_file(path):
     return path.split('/')[-1]
+
+def save_error_image(pred_dict,args):
+    image_file='train_data/ppdataset/train/train/'
+    image_error_file = 'error_file/'
+    image_label = 'error_file/gt_diff.txt'
+    if args.rec_label_path == None:
+        return
+    else:
+        with open(args.rec_label_path, 'r') as f:
+            all = f.readlines()
+            with open(image_label, 'w') as f_w:
+                for each in all:
+                    each = each.strip().split('\t')
+                    key = cut_path_file(each[0])
+                    value = pred_dict.get(key,0)
+                    if value !=each[1]:
+                        p_string = "diff{}:{} ---{}\n".format(key,value,each[1])
+                        f_w.writelines(p_string)
+                    # else:
+                    #     p_string = "same{}:{} ---{}\n".format(key,value,each[1])
+                    #     print(p_string)
+                        img = cv2.imread(image_file+key)
+                        cv2.imwrite(image_error_file+key, img)
+        return
+
 class TextRecognizer(object):
     def __init__(self, args):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
@@ -72,8 +97,8 @@ class TextRecognizer(object):
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
         assert imgC == img.shape[2]
-        if self.character_type == "ch":
-            imgW = int((32 * max_wh_ratio))
+        # if self.character_type == "ch":
+        #     imgW = int((32 * max_wh_ratio))
         h, w = img.shape[:2]
         ratio = w / float(h)
         if math.ceil(imgH * ratio) > imgW:
@@ -257,6 +282,7 @@ def main(args):
     total_images_num = 0
     valid_image_file_list = []
     img_list = []
+    pred_dict= {}
     with open(args.rec_save_path, "w") as fout:
         for idx, image_file in enumerate(image_file_list):
             img, flag = check_and_read_gif(image_file)
@@ -286,9 +312,13 @@ def main(args):
                     logger.info("Predicts of {}:{}".format(valid_image_file_list[
                         ino], rec_res[ino]))
                     fout.write(cut_path_file(valid_image_file_list[ino]) + "\t" + rec_res[ino][0] + "\n")
+                    pred_dict[cut_path_file(valid_image_file_list[ino])]=rec_res[ino][0]
+                    # print(pred_dict)
                 total_images_num += len(valid_image_file_list)
                 valid_image_file_list = []
                 img_list = []
+    # print(pred_dict)
+    save_error_image(pred_dict,args)
     logger.info("Total predict time for {} images, cost: {:.3f}".format(
         total_images_num, total_run_time))
 
