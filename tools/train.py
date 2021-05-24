@@ -98,7 +98,7 @@ def main(config, device, logger, vdl_writer):
         logger.info('valid dataloader has {} iters'.format(
             len(valid_dataloader)))
 
-    test = False
+    test = config['Global']['count_model']
     if test == True:
         test_model(model)
     else:
@@ -108,7 +108,7 @@ def main(config, device, logger, vdl_writer):
                       eval_class, pre_best_model_dict, logger, vdl_writer)
 
 def test_model(model):
-    save_path = './inference/ztl_test/ctc_test'
+    save_path = './inference/ztl_test/test'
     model = to_static(
         model,
         input_spec=[

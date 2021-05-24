@@ -192,7 +192,7 @@ def train(config,
             format(start_eval_step, eval_batch_step))
 
     if dist.get_rank() == 0:
-        print(model)
+        # print(model)
         total_param = count_param(model,name = 'total')
         # backbone_param = count_param(model._layers.backbone,name = 'backbone')
         # head_param = count_param(model._layers.head,name = 'head')
