@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import math
+import string
+
 import cv2
 import numpy as np
 import random
 
 from .text_image_aug import tia_perspective, tia_stretch, tia_distort
-
+from .cut_aug import RandomErasing, SingleErasing, LineErasing, CropErasing
 
 class RecAug(object):
     def __init__(self, use_tia=True, aug_prob=0.4, **kwargs):
@@ -26,8 +28,8 @@ class RecAug(object):
         self.aug_prob = aug_prob
 
     def __call__(self, data):
-        img = data['image']
-        img = warp(img, 10, self.use_tia, self.aug_prob)
+        #img = data['image']
+        img = warp(data, 10, self.use_tia, self.aug_prob)
         data['image'] = img
         return data
 
@@ -306,6 +308,7 @@ class Config:
         self.jitter = True
         self.blur = True
         self.color = True
+        self.cut = True
 
 
 def rad(x):
@@ -393,10 +396,13 @@ def get_warpAffine(config):
     return rz
 
 
-def warp(img, ang, use_tia=True, prob=0.4):
+def warp(data, ang, use_tia=True, prob=0.4):
     """
     warp
     """
+    img = data["image"]
+    label = data["label"]
+    print("_____ : ", label)
     h, w, _ = img.shape
     config = Config(use_tia=use_tia)
     config.make(w, h, ang)
@@ -435,4 +441,12 @@ def warp(img, ang, use_tia=True, prob=0.4):
     if config.reverse:
         if random.random() <= prob:
             new_img = 255 - new_img
+    if config.cut:
+        if random.random() <= prob:
+            aug_list = ['RandomErasing', 'SingleErasing', 'LineErasing', 'CropErasing']
+            idx = random.randint(0, len(aug_list) - 1)
+            op = eval(aug_list[idx])
+            re = op()
+            new_img = re(img, len(label))
+
     return new_img

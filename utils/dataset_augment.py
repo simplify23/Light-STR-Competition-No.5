@@ -6,15 +6,27 @@ import sys
 sys.path.append("..")
 from ppocr.data.imaug import RecAug, operators
 import cv2
+from ppocr.data.imaug.cut_aug import RandomErasing, LineErasing, SingleErasing, CropErasing
 
-out_path = "./../train_data/train/"
-gt_file = './../train_data/LabelTrain.txt'
+out_path = "./../train_data/tmp/"
+gt_file = './../train_data/tmp/labeltrain.txt'
 cnt = 0
-thread = 40
+thread = 2
+
 
 def augment(data):
     aug = RecAug(True, 0.8)
     data = aug(data)
+    return data
+
+
+def test(data):
+    img = data["image"]
+    aug_list = ['RandomErasing', 'SingleErasing', 'LineErasing', 'CropErasing']
+    idx = random.randint(0, len(aug_list) - 1)
+    op = eval(aug_list[idx])
+    re = op()
+    data["image"] = re(img, 5)
     return data
 
 
@@ -35,6 +47,7 @@ def parse(c, n, labels, thread):
             data = augment(data)
             data_list.append(data)
     return data_list
+
 
 def format_path(cnt):
     cnt = str(cnt)
