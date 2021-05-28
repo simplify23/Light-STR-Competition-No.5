@@ -54,7 +54,7 @@ class RandomErasing(object):
         return img
 
 class LineErasing(object):
-    def __init__(self, scale=0.2, kl=-PI / 4, kh=PI / 4):
+    def __init__(self, scale=0.05, kl=-PI / 4, kh=PI / 4):
         self.kl = kl
         self.kh = kh
         self.scale = scale
