@@ -1,0 +1,122 @@
+Global:
+  debug: false
+  use_gpu: true
+  epoch_num: 700
+  log_smooth_window: 20
+  print_batch_step: 30
+  save_model_dir: ./output/rec/ztl_700_none_bilstm_96_4_ctc
+  save_epoch_step: 50
+  eval_batch_step:
+  - 0
+  - 2000
+  cal_metric_during_train: true
+  pretrained_model:
+  checkpoints:
+  save_inference_dir:
+  use_visualdl: true
+  infer_img: doc/imgs_words/ch/word_1.jpg
+  character_dict_path: ppocr/utils/ppocr_keys_v2.txt
+  character_type: ch
+  max_text_length: 25
+  infer_mode: false
+  use_space_char: true
+  save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
+  count_model: False
+
+Optimizer:
+  name: Adam
+  beta1: 0.9
+  beta2: 0.999
+  lr:
+    name: Cosine
+    learning_rate: 0.001
+  regularizer:
+    name: L2
+    factor: 1.0e-05
+Architecture:
+  model_type: rec
+  algorithm: CRNN
+#  Transform:
+#    name: TPS
+#    num_fiducial: 12
+#    loc_lr: 0.1
+#    model_name: small
+  Backbone:
+    name: MobileNetV3
+    scale: 0.5
+    model_name: small
+    small_stride:
+    - 1
+    - 2
+    - 2
+    - 2
+  Neck:
+    name: SequenceEncoder
+    encoder_type: rnn
+    hidden_size: 96
+    num_layers: 4
+  Head:
+    name: CTCHead
+    fc_decay: 0.0004
+Loss:
+  name: CTCLoss
+PostProcess:
+  name: CTCLabelDecode
+Metric:
+  name: RecMetric
+  main_indicator: acc
+Train:
+  dataset:
+    name: SimpleDataSet
+    data_dir: ./train_data/
+    label_file_list:
+    - ./train_data/ppdataset/train/labeltrain.txt
+    transforms:
+    - DecodeImage:
+        img_mode: BGR
+        channel_first: false
+    - RecAug:
+        use_tia: true
+        aug_prob: 0.4
+    - CTCLabelEncode: null
+    - RecResizeImg:
+        image_shape:
+        - 3
+        - 32
+        - 320
+    - KeepKeys:
+        keep_keys:
+        - image
+        - label
+        - length
+  loader:
+    shuffle: true
+    batch_size_per_card: 300
+    drop_last: true
+    num_workers: 8
+Eval:
+  dataset:
+    name: SimpleDataSet
+    data_dir: ./train_data
+    label_file_list:
+    - ./train_data/ppdataset/train/labelval.txt
+    transforms:
+    - DecodeImage:
+        img_mode: BGR
+        channel_first: false
+    - CTCLabelEncode: null
+    - RecResizeImg:
+        image_shape:
+        - 3
+        - 32
+        - 320
+    - KeepKeys:
+        keep_keys:
+        - image
+        - label
+        - length
+  loader:
+    shuffle: false
+    drop_last: false
+    batch_size_per_card: 256
+    num_workers: 8

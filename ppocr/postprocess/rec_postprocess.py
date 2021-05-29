@@ -125,11 +125,13 @@ class BaseRecLabelDecode(object):
     def add_special_char(self, dict_character):
         return dict_character
 
-    def beamdecode(self,mat,classes = None,lm=None,beamWidth=10):
+    def beamdecode(self,text_prob,lm=None,beamWidth=5):
         "beam search as described by the paper of Hwang et al. and the paper of Graves et al."
-
         blankIdx = self.get_ignored_tokens()
-        maxT, maxC = mat.shape
+        label = None
+        char_list = []
+        conf_list = []
+        maxT, maxC = text_prob.shape
 
         # initialise beam state
         last = BeamState()
@@ -153,10 +155,10 @@ class BaseRecLabelDecode(object):
                 # in case of non-empty beam
                 if labeling:
                     # probability of paths with repeated last char at the end
-                    prNonBlank = last.entries[labeling].prNonBlank * mat[t, labeling[-1]]
+                    prNonBlank = last.entries[labeling].prNonBlank * text_prob[t, labeling[-1]]
 
                 # probability of paths ending with a blank
-                prBlank = (last.entries[labeling].prTotal) * mat[t, blankIdx]
+                prBlank = (last.entries[labeling].prTotal) * text_prob[t, blankIdx]
 
                 # add beam at current time-step if needed
                 addBeam(curr, labeling)
@@ -172,13 +174,15 @@ class BaseRecLabelDecode(object):
                 # extend current beam-labeling
                 for c in range(maxC - 1):
                     # add new char to current beam-labeling
+                    if text_prob[t,c] < 0.001:
+                        continue
                     newLabeling = labeling + (c,)
 
                     # if new labeling contains duplicate char at the end, only consider paths ending with a blank
                     if labeling and labeling[-1] == c:
-                        prNonBlank = mat[t, c] * last.entries[labeling].prBlank
+                        prNonBlank = text_prob[t, c] * last.entries[labeling].prBlank
                     else:
-                        prNonBlank = mat[t, c] * last.entries[labeling].prTotal
+                        prNonBlank = text_prob[t, c] * last.entries[labeling].prTotal
 
                     # add beam at current time-step if needed
                     addBeam(curr, newLabeling)
@@ -189,7 +193,7 @@ class BaseRecLabelDecode(object):
                     curr.entries[newLabeling].prTotal += prNonBlank
 
                     # apply LM
-                    applyLM(curr.entries[labeling], curr.entries[newLabeling], classes, lm)
+                    applyLM(curr.entries[labeling], curr.entries[newLabeling], label, lm)
 
             # set new beam state
             last = curr
@@ -199,20 +203,15 @@ class BaseRecLabelDecode(object):
 
         # sort by probability
         bestLabeling = last.sort()[0] # get most probable labeling
-
-    #     if text_prob is not None:
-    #         conf_list.append(text_prob[batch_idx][idx])
-    #     else:
-    #         conf_list.append(1)
-    #     text = ''.join(char_list)
-    #     result_list.append((text, np.mean(conf_list)))
-    # return result_list
+        print(bestLabeling)
+        for i,idx in enumerate(bestLabeling):
+            if idx not in blankIdx:
+                char_list.append(self.character[int(idx)])
+                conf_list.append(text_prob[i][idx])
+        text = ''.join(char_list)
         # map labels to chars
-        text = ''
-        for l in bestLabeling:
-            text += classes[l]
-
-        return text
+        print(text,conf_list)
+        return (text, np.mean(conf_list))
 
     def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
         """ convert text-index into text-label. """
@@ -254,20 +253,26 @@ class CTCLabelDecode(BaseRecLabelDecode):
                  **kwargs):
         super(CTCLabelDecode, self).__init__(character_dict_path,
                                              character_type, use_space_char)
-    def beamsearch(self, preds, label=None, *args, **kwargs):
-        batch_size = len(preds)
+    def beamsearch(self, preds_idx, *args, **kwargs):
+        batch_size = len(preds_idx)
+        result_list = []
         for batch_idx in range(batch_size):
-            char_list = []
-            conf_list = []
-            for idx in range(len(preds[batch_idx])):
-                self.beamdecode(preds[batch_idx],label)
+            result = self.beamdecode(preds_idx[batch_idx])
+            result_list.append(result)
+        return result_list
 
     def __call__(self, preds, label=None, *args, **kwargs):
         if isinstance(preds, paddle.Tensor):
             preds = preds.numpy()
-        preds_idx = preds.argmax(axis=2)
-        preds_prob = preds.max(axis=2)
-        text = self.decode(preds_idx, preds_prob, is_remove_duplicate=True)
+        # preds(batch_size = 200, max_length = 80,char_num = 3977)
+        # label(batch_size = 200, max_length = 30)
+        flag = False
+        if label is None and flag == True:
+            text = self.beamsearch(preds)
+        else:
+            preds_idx = preds.argmax(axis=2)
+            preds_prob = preds.max(axis=2)
+            text = self.decode(preds_idx, preds_prob, is_remove_duplicate=True)
         if label is None:
             return text
         label = self.decode(label)

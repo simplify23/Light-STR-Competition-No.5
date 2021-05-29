@@ -118,7 +118,7 @@ class MobileNetV3(nn.Layer):
 
         self.conv2 = ConvBNLayer(
             in_channels=inplanes,
-            out_channels=make_divisible(scale * cls_ch_squeeze),
+            out_channels=192,#make_divisible(scale * cls_ch_squeeze),
             kernel_size=1,
             stride=1,
             padding=0,
@@ -128,7 +128,7 @@ class MobileNetV3(nn.Layer):
             name='conv_last')
 
         self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
-        self.out_channels = make_divisible(scale * cls_ch_squeeze)
+        self.out_channels = 192#make_divisible(scale * cls_ch_squeeze)
 
     def forward(self, x):
         x = self.conv1(x)
