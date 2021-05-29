@@ -3,8 +3,8 @@ Global:
   epoch_num: 500
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/ztl_500_mv_l_trans_192
-  save_epoch_step: 50
+  save_model_dir: ./output/rec/ztl_500_tps_bilstm4_att_96
+  save_epoch_step: 20
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
   cal_metric_during_train: True
@@ -16,11 +16,10 @@ Global:
   # for data or label process
   character_dict_path: ppocr/utils/ppocr_keys_v2.txt
   character_type: ch
-  max_text_length: 35
+  max_text_length: 25
   infer_mode: False
   use_space_char: True
-  save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
-  count_model: False
+  save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_tps_bilstm4_att_predict.txt
 
 
 Optimizer:
@@ -36,38 +35,29 @@ Optimizer:
 
 Architecture:
   model_type: rec
-  algorithm: CRNN
-#  Transform:
-#    name: TPS
-#    num_fiducial: 12
-#    loc_lr: 0.1
-#    model_name: small
+  algorithm: RARE
+  Transform:
+    name: TPS
+    num_fiducial: 20
+    loc_lr: 0.1
+    model_name: small
   Backbone:
     name: MobileNetV3
     scale: 0.5
     model_name: large
-#  Backbone:
-#    name: ResNet
-#    layers: 18
-#  Backbone:
-#    name: MobileNetV3
-#    scale: 0.5
-#    model_name: small
-#    small_stride: [1, 2, 2, 2]
   Neck:
     name: SequenceEncoder
-    encoder_type: trans+rnn
-    hidden_size: 192
-    num_layers : 2
+    encoder_type: rnn
+    hidden_size: 96
   Head:
-    name: CTCHead
-    fc_decay: 0.0004
+    name: AttentionHead
+    hidden_size: 96
 
 Loss:
-  name: CTCLoss
+  name: AttentionLoss
 
 PostProcess:
-  name: CTCLabelDecode
+  name: AttnLabelDecode
 
 Metric:
   name: RecMetric
@@ -92,7 +82,7 @@ Train:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 200
+    batch_size_per_card: 300
     drop_last: True
     num_workers: 8
 
@@ -113,5 +103,5 @@ Eval:
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 200
+    batch_size_per_card: 256
     num_workers: 8

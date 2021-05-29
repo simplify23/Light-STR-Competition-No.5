@@ -38,12 +38,13 @@ class Im2Seq(nn.Layer):
 
 class TransformerPosEncoder(nn.Layer):
     def __init__(self,  max_text_length=35, num_heads=8,
-                 num_encoder_tus=2, hidden_dims=480):
+                 num_encoder_tus=2, hidden_dims=96,width=80):
         super(TransformerPosEncoder, self).__init__()
         self.max_length = max_text_length
         self.num_heads = num_heads
         self.num_encoder_TUs = num_encoder_tus
         self.hidden_dims = hidden_dims
+        self.width =width
         # Transformer encoder
         t = 35 #256
         c = 96
@@ -65,7 +66,8 @@ class TransformerPosEncoder(nn.Layer):
             weight_sharing=True)
 
     def forward(self, conv_features):
-        feature_dim = conv_features.shape[1]
+        # feature_dim = conv_features.shape[1]
+        feature_dim = self.width
         encoder_word_pos = paddle.to_tensor(np.array(range(0, feature_dim)).reshape(
             (feature_dim, 1)).astype('int64'))
         enc_inputs = [conv_features, encoder_word_pos, None]
@@ -76,13 +78,17 @@ class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2):
         super(EncoderWithTrans, self).__init__()
         self.out_channels = hidden_size * 2
-        self.lstm = nn.LSTM(
-            in_channels, hidden_size, direction='bidirectional', num_layers=num_layers)
-        self.transformer=TransformerPosEncoder()
+        self.custom_channel = 192
+        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel)
+        self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
+        self.up_linear = EncoderWithFC(self.custom_channel,hidden_size * 2,'up_encoder')
 
     def forward(self, x):
+        # x = self.down_linear(x)
         x = self.transformer(x)
-        x, _ = self.lstm(x)
+        x = self.up_linear(x)
+        # x, _ = self.lstm(x)
+        # print(x.shape)
         return x
 
 class EncoderWithRNN(nn.Layer):
@@ -98,17 +104,18 @@ class EncoderWithRNN(nn.Layer):
 
 
 class EncoderWithFC(nn.Layer):
-    def __init__(self, in_channels, hidden_size,num_layers):
+    def __init__(self, in_channels, hidden_size,name='reduce_encoder_fea',num_layers=1):
         super(EncoderWithFC, self).__init__()
         self.out_channels = hidden_size
         weight_attr, bias_attr = get_para_bias_attr(
-            l2_decay=0.00001, k=in_channels, name='reduce_encoder_fea')
+            l2_decay=0.00001, k=in_channels, name=name)#'reduce_encoder_fea')
         self.fc = nn.Linear(
             in_channels,
             hidden_size,
             weight_attr=weight_attr,
             bias_attr=bias_attr,
-            name='reduce_encoder_fea')
+            name = name)
+            # name='reduce_encoder_fea')
 
     def forward(self, x):
         x = self.fc(x)
