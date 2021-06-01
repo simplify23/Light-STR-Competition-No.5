@@ -402,7 +402,6 @@ def warp(data, ang, use_tia=True, prob=0.4):
     """
     img = data["image"]
     label = data["label"]
-    print("_____ : ", label)
     h, w, _ = img.shape
     config = Config(use_tia=use_tia)
     config.make(w, h, ang)
