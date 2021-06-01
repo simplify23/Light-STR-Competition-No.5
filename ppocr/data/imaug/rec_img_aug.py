@@ -64,6 +64,18 @@ class RecResizeImg(object):
         data['image'] = norm_img
         return data
 
+class SRNRecResizeImgEx(object):
+    def __init__(self,
+                 image_shape,
+                 **kwargs):
+        self.image_shape = image_shape
+
+    def __call__(self, data):
+        img = data['image']
+        norm_img = resize_norm_img_ex(img, self.image_shape)
+        data['image'] = norm_img
+        return data
+
 
 class SRNRecResizeImg(object):
     def __init__(self, image_shape, num_heads, max_text_length, **kwargs):
@@ -133,6 +145,25 @@ def resize_norm_img_chinese(img, image_shape):
     padding_im[:, :, 0:resized_w] = resized_image
     return padding_im
 
+def resize_norm_img_ex(img, image_shape):
+    imgC, imgH, imgW = image_shape
+
+    im_hei = img.shape[0]
+    im_wid = img.shape[1]
+    new_wid = imgW
+    if im_wid <= im_hei * 1:
+        new_wid = imgH
+    elif im_wid <= im_hei * 2:
+        new_wid = imgH * 2
+    elif im_wid <= im_hei * 3:
+        new_wid = imgH * 3
+    elif im_wid <= im_hei * 4:
+        new_wid = imgH * 4
+    img_new = cv2.resize(img, (new_wid, imgH))
+    img_new = img_new.transpose((2, 0, 1))
+    padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+    padding_im[:, :, 0:new_wid] = img_new
+    return padding_im
 
 def resize_norm_img_srn(img, image_shape):
     imgC, imgH, imgW = image_shape
@@ -140,13 +171,14 @@ def resize_norm_img_srn(img, image_shape):
     img_black = np.zeros((imgH, imgW))
     im_hei = img.shape[0]
     im_wid = img.shape[1]
-
     if im_wid <= im_hei * 1:
         img_new = cv2.resize(img, (imgH * 1, imgH))
     elif im_wid <= im_hei * 2:
         img_new = cv2.resize(img, (imgH * 2, imgH))
     elif im_wid <= im_hei * 3:
         img_new = cv2.resize(img, (imgH * 3, imgH))
+    elif im_wid <= im_hei * 4:
+        img_new = cv2.resize(img, (imgH * 4, imgH))
     else:
         img_new = cv2.resize(img, (imgW, imgH))
 
@@ -402,7 +434,6 @@ def warp(data, ang, use_tia=True, prob=0.4):
     """
     img = data["image"]
     label = data["label"]
-    print("_____ : ", label)
     h, w, _ = img.shape
     config = Config(use_tia=use_tia)
     config.make(w, h, ang)
