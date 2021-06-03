@@ -83,6 +83,7 @@ class SingleErasing(object):
         self.r1 = r1
 
     def __call__(self, img, num, *args):
+        # print("==== : ", num)
         h, w = img.shape[0], img.shape[1]
         sw, sh = w, h
         if w > h:

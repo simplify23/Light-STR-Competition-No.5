@@ -76,7 +76,7 @@ Train:
           channel_first: False
       - SRNLabelEncode: # Class handling label
       - SRNRecResizeImg:
-          image_shape: [3, 32,320]
+          image_shape: [3, 64,640]
       - KeepKeys:
           keep_keys: ['image',
                       'label',
