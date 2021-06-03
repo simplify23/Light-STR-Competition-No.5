@@ -57,7 +57,7 @@ class TransformerPosEncoder(nn.Layer):
             d_value=int(self.hidden_dims / self.num_heads),
             d_model=self.hidden_dims,
             # channel mix for double 256
-            d_inner_hid=self.hidden_dims*2,
+            d_inner_hid=self.hidden_dims*3, #2,
             prepostprocess_dropout=0.1,
             attention_dropout=0.1,
             relu_dropout=0.1,
@@ -77,11 +77,11 @@ class TransformerPosEncoder(nn.Layer):
 class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2):
         super(EncoderWithTrans, self).__init__()
-        self.out_channels = hidden_size * 2
-        self.custom_channel = 192
-        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel)
-        self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
-        self.up_linear = EncoderWithFC(self.custom_channel,hidden_size * 2,'up_encoder')
+        self.out_channels = hidden_size * 3 #2
+        self.custom_channel = hidden_size
+        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers)
+        # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
+        self.up_linear = EncoderWithFC(self.custom_channel,self.out_channels,'up_encoder')
 
     def forward(self, x):
         # x = self.down_linear(x)
@@ -146,7 +146,7 @@ class SequenceEncoder(nn.Layer):
                 'reshape': Im2Seq,
                 'fc': EncoderWithFC,
                 'rnn': EncoderWithRNN,
-                'trans+rnn':EncoderWithTrans,
+                'transformer': EncoderWithTrans,
             }
             assert encoder_type in support_encoder_dict, '{} must in {}'.format(
                 encoder_type, support_encoder_dict.keys())
