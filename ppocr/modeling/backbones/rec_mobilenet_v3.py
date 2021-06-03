@@ -137,12 +137,15 @@ class MobileNetV3(nn.Layer):
             act='hardswish',
             name='conv_custom')
         self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+        self.pool_ex = nn.MaxPool2D(kernel_size=4, stride=4, padding=0)
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.blocks(x)
         x = self.conv2(x)
-        x = self.pool(x)
+        if x.shape[2] <= 2:
+            x = self.pool(x)
+        else:
+            x = self.pool_ex(x)
         x = self.conv_smooth(x)
-        # print(x.shape)
         return x
