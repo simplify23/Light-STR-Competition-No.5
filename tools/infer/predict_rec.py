@@ -70,6 +70,7 @@ class TextRecognizer(object):
         self.rec_algorithm = args.rec_algorithm
         self.max_text_length = args.max_text_length
         self.save_path = args.rec_save_path
+        self.use_srn_resize = args.use_srn_resize
         postprocess_params = {
             'name': 'CTCLabelDecode',
             "character_type": args.rec_char_type,
@@ -112,6 +113,26 @@ class TextRecognizer(object):
         resized_image /= 0.5
         padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
         padding_im[:, :, 0:resized_w] = resized_image
+        return padding_im
+
+    def resize_norm_img_ex(self, img, image_shape):
+        imgC, imgH, imgW = image_shape
+
+        im_hei = img.shape[0]
+        im_wid = img.shape[1]
+        new_wid = imgW
+        if im_wid <= im_hei * 1:
+            new_wid = imgH
+        elif im_wid <= im_hei * 2:
+            new_wid = imgH * 2
+        elif im_wid <= im_hei * 3:
+            new_wid = imgH * 3
+        elif im_wid <= im_hei * 4:
+            new_wid = imgH * 4
+        img_new = cv2.resize(img, (new_wid, imgH))
+        img_new = img_new.transpose((2, 0, 1))
+        padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+        padding_im[:, :, 0:new_wid] = img_new
         return padding_im
 
     def resize_norm_img_srn(self, img, image_shape):
@@ -210,8 +231,11 @@ class TextRecognizer(object):
                 max_wh_ratio = max(max_wh_ratio, wh_ratio)
             for ino in range(beg_img_no, end_img_no):
                 if self.rec_algorithm != "SRN":
-                    norm_img = self.resize_norm_img(img_list[indices[ino]],
-                                                    max_wh_ratio)
+                    if self.use_srn_resize:
+                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], [3, 64, 640])
+                    else:
+                        norm_img = self.resize_norm_img(img_list[indices[ino]],
+                                                        max_wh_ratio)
                     norm_img = norm_img[np.newaxis, :]
                     norm_img_batch.append(norm_img)
                 else:
