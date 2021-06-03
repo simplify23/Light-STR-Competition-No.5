@@ -11,11 +11,68 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import division
+from __future__ import print_function
 import numpy as np
 import string
 import paddle
 from paddle.nn import functional as F
 
+class BeamEntry:
+    "information about one single beam at specific time-step"
+    def __init__(self):
+        self.prTotal = 0 # blank and non-blank
+        self.prNonBlank = 0 # non-blank
+        self.prBlank = 0 # blank
+        self.prText = 1 # LM score
+        self.lmApplied = False # flag if LM was already applied to this beam
+        self.labeling = () # beam-labeling
+
+
+class BeamState:
+    "information about the beams at specific time-step"
+    def __init__(self):
+        self.entries = {}
+
+    def norm(self):
+        "length-normalise LM score"
+        for (k, _) in self.entries.items():
+            labelingLen = len(self.entries[k].labeling)
+            self.entries[k].prText = self.entries[k].prText ** (1.0 / (labelingLen if labelingLen else 1.0))
+
+    def sort(self):
+        "return beam-labelings, sorted by probability"
+        beams = [v for (_, v) in self.entries.items()]
+        sortedBeams = sorted(beams, reverse=True, key=lambda x: x.prTotal*x.prText)
+        return [x.labeling for x in sortedBeams]
+
+
+def applyLM(parentBeam, childBeam, classes, lm):
+    "calculate LM score of child beam by taking score from parent beam and bigram probability of last two chars"
+    if lm and not childBeam.lmApplied:
+        c1 = classes[parentBeam.labeling[-1] if parentBeam.labeling else classes.index(' ')] # first char
+        c2 = classes[childBeam.labeling[-1]] # second char
+        lmFactor = 0.01 # influence of language model
+        bigramProb = lm.getCharBigram(c1, c2) ** lmFactor # probability of seeing first and second char next to each other
+        childBeam.prText = parentBeam.prText * bigramProb # probability of char sequence
+        childBeam.lmApplied = True # only apply LM once per beam entry
+
+
+def addBeam(beamState, labeling):
+    "add beam if it does not yet exist"
+    if labeling not in beamState.entries:
+        beamState.entries[labeling] = BeamEntry()
+
+def testBeamSearch():
+    "test decoder"
+    classes = 'ab'
+    mat = np.array([[0.4, 0, 0.6], [0.4, 0, 0.6]])
+    print('Test beam search')
+    expected = 'a'
+    actual = ctcBeamSearch(mat, classes, None)
+    print('Expected: "' + expected + '"')
+    print('Actual: "' + actual + '"')
+    print('OK' if expected == actual else 'ERROR')
 
 class BaseRecLabelDecode(object):
     """ Convert between text-label and text-index """
@@ -68,6 +125,94 @@ class BaseRecLabelDecode(object):
     def add_special_char(self, dict_character):
         return dict_character
 
+    def beamdecode(self,text_prob,lm=None,beamWidth=5):
+        "beam search as described by the paper of Hwang et al. and the paper of Graves et al."
+        blankIdx = self.get_ignored_tokens()
+        label = None
+        char_list = []
+        conf_list = []
+        maxT, maxC = text_prob.shape
+
+        # initialise beam state
+        last = BeamState()
+        labeling = ()
+        last.entries[labeling] = BeamEntry()
+        last.entries[labeling].prBlank = 1
+        last.entries[labeling].prTotal = 1
+
+        # go over all time-steps
+        for t in range(maxT):
+            curr = BeamState()
+
+            # get beam-labelings of best beams
+            bestLabelings = last.sort()[0:beamWidth]
+
+            # go over best beams
+            for labeling in bestLabelings:
+
+                # probability of paths ending with a non-blank
+                prNonBlank = 0
+                # in case of non-empty beam
+                if labeling:
+                    # probability of paths with repeated last char at the end
+                    prNonBlank = last.entries[labeling].prNonBlank * text_prob[t, labeling[-1]]
+
+                # probability of paths ending with a blank
+                prBlank = (last.entries[labeling].prTotal) * text_prob[t, blankIdx]
+
+                # add beam at current time-step if needed
+                addBeam(curr, labeling)
+
+                # fill in data
+                curr.entries[labeling].labeling = labeling
+                curr.entries[labeling].prNonBlank += prNonBlank
+                curr.entries[labeling].prBlank += prBlank
+                curr.entries[labeling].prTotal += prBlank + prNonBlank
+                curr.entries[labeling].prText = last.entries[labeling].prText # beam-labeling not changed, therefore also LM score unchanged from
+                curr.entries[labeling].lmApplied = True # LM already applied at previous time-step for this beam-labeling
+
+                # extend current beam-labeling
+                for c in range(maxC - 1):
+                    # add new char to current beam-labeling
+                    if text_prob[t,c] < 0.001:
+                        continue
+                    newLabeling = labeling + (c,)
+
+                    # if new labeling contains duplicate char at the end, only consider paths ending with a blank
+                    if labeling and labeling[-1] == c:
+                        prNonBlank = text_prob[t, c] * last.entries[labeling].prBlank
+                    else:
+                        prNonBlank = text_prob[t, c] * last.entries[labeling].prTotal
+
+                    # add beam at current time-step if needed
+                    addBeam(curr, newLabeling)
+
+                    # fill in data
+                    curr.entries[newLabeling].labeling = newLabeling
+                    curr.entries[newLabeling].prNonBlank += prNonBlank
+                    curr.entries[newLabeling].prTotal += prNonBlank
+
+                    # apply LM
+                    applyLM(curr.entries[labeling], curr.entries[newLabeling], label, lm)
+
+            # set new beam state
+            last = curr
+
+        # normalise LM scores according to beam-labeling-length
+        last.norm()
+
+        # sort by probability
+        bestLabeling = last.sort()[0] # get most probable labeling
+        print(bestLabeling)
+        for i,idx in enumerate(bestLabeling):
+            if idx not in blankIdx:
+                char_list.append(self.character[int(idx)])
+                conf_list.append(text_prob[i][idx])
+        text = ''.join(char_list)
+        # map labels to chars
+        print(text,conf_list)
+        return (text, np.mean(conf_list))
+
     def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
         """ convert text-index into text-label. """
         result_list = []
@@ -108,13 +253,26 @@ class CTCLabelDecode(BaseRecLabelDecode):
                  **kwargs):
         super(CTCLabelDecode, self).__init__(character_dict_path,
                                              character_type, use_space_char)
+    def beamsearch(self, preds_idx, *args, **kwargs):
+        batch_size = len(preds_idx)
+        result_list = []
+        for batch_idx in range(batch_size):
+            result = self.beamdecode(preds_idx[batch_idx])
+            result_list.append(result)
+        return result_list
 
     def __call__(self, preds, label=None, *args, **kwargs):
         if isinstance(preds, paddle.Tensor):
             preds = preds.numpy()
-        preds_idx = preds.argmax(axis=2)
-        preds_prob = preds.max(axis=2)
-        text = self.decode(preds_idx, preds_prob, is_remove_duplicate=True)
+        # preds(batch_size = 200, max_length = 80,char_num = 3977)
+        # label(batch_size = 200, max_length = 30)
+        flag = False
+        if label is None and flag == True:
+            text = self.beamsearch(preds)
+        else:
+            preds_idx = preds.argmax(axis=2)
+            preds_prob = preds.max(axis=2)
+            text = self.decode(preds_idx, preds_prob, is_remove_duplicate=True)
         if label is None:
             return text
         label = self.decode(label)

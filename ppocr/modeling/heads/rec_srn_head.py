@@ -42,7 +42,7 @@ class PVAM(nn.Layer):
         self.num_encoder_TUs = num_encoder_tus
         self.hidden_dims = hidden_dims
         # Transformer encoder
-        t = 128 #256
+        t = 256 #256
         c = 512
         self.wrap_encoder_for_feature = WrapEncoderForFeature(
             src_vocab_size=1,

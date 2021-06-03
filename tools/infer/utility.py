@@ -72,6 +72,7 @@ def parse_args():
         default="./ppocr/utils/ppocr_keys_v1.txt")
     parser.add_argument("--use_space_char", type=str2bool, default=True)
     parser.add_argument("--rec_save_path", type=str)
+    parser.add_argument("--rec_label_path", type=str,default=None)
     parser.add_argument(
         "--vis_font_path", type=str, default="./doc/fonts/simfang.ttf")
     parser.add_argument("--drop_score", type=float, default=0.5)

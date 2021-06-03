@@ -1,9 +1,9 @@
 Global:
   use_gpu: True
-  epoch_num: 40 #72
+  epoch_num: 500 #72
   log_smooth_window: 20
   print_batch_step: 50
-  save_model_dir: ./output/rec/srn_mixer_exp1
+  save_model_dir: ./output/rec/fpn50_srn_2_4_baseline
   save_epoch_step: 10
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 5000]
@@ -14,13 +14,14 @@ Global:
   use_visualdl: True     #可视化开关
   infer_img: doc/imgs_words/ch/word_1.jpg
   # for data or label process
-  character_dict_path: 
-  character_type: en
+  character_dict_path: ppocr/utils/ppocr_keys_v2.txt
+  character_type: ch
   max_text_length: 25
   num_heads: 8
   infer_mode: False
-  use_space_char: False
+  use_space_char: True
   save_res_path: ./output/rec/predicts_srn.txt
+  count_model: True
 
 
 Optimizer:
@@ -36,11 +37,17 @@ Architecture:
   algorithm: SRN
   in_channels: 1
   Transform:
-  Backbone:
-    name: ResNetFPN
+#  Backbone:
 #    name: MobileNetV3
 #    scale: 0.5
 #    model_name: large
+  Backbone:
+    name: ResNetFPN
+#  Backbone:
+#    name: MobileNetV3
+#    scale: 0.5
+#    model_name: small
+#    small_stride: [1, 2, 2, 2]
 #  Neck:
 #    name: SequenceEncoder
 #    encoder_type: cnn
@@ -69,14 +76,14 @@ Train:
 #    data_dir: ./train_data/data_lmdb_release/training/
     name: SimpleDataSet
     data_dir: ./train_data/
-    label_file_list: [ "./train_data/90kDICT32px/annotation_train_two_Synth_shuf_clean.txt" ]
+    label_file_list: ["./train_data/ppdataset/train/labeltrain.txt"]
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
           channel_first: False
       - SRNLabelEncode: # Class handling label
       - SRNRecResizeImg:
-          image_shape: [3, 64,640]
+          image_shape: [3, 32,320]
       - KeepKeys:
           keep_keys: ['image',
                       'label',
@@ -87,7 +94,7 @@ Train:
                       'gsrm_slf_attn_bias2'] # dataloader will return list in this order
   loader:
     shuffle: False
-    batch_size_per_card: 512
+    batch_size_per_card: 82
     drop_last: False
     num_workers: 4
 
@@ -96,8 +103,8 @@ Eval:
 #    name: LMDBDataSet
 #    data_dir: ./train_data/data_lmdb_release/validation/
     name: SimpleDataSet
-    data_dir: ./train_data/
-    label_file_list: [ "./train_data/icdar2015_test/gt.txt" ]
+    data_dir: ./train_data
+    label_file_list: ["./train_data/ppdataset/train/labelval.txt"]
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -116,5 +123,5 @@ Eval:
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 256
+    batch_size_per_card: 82
     num_workers: 4

@@ -4,12 +4,12 @@ def process_label(gt_file):
     with open(gt_file, 'r', encoding='UTF-8') as f:
         all = f.readlines()
         for each in all:
-            # each = 'train/'+each
-            # each = each.strip()+'\n'
+            each = 'train/'+each
+            each = each.strip()+'\n'
             gt_list.append(each)
-    print(gt_list)
-    # with open(gt_file, 'w', encoding='UTF-8') as f:
-    #     f.writelines(gt_list)
+    # print(gt_list)
+    with open(gt_file, 'w', encoding='UTF-8') as f:
+        f.writelines(gt_list)
 
 def write_txt(gt_list,gt_file):
     with open(gt_file, 'w', encoding='UTF-8') as f:
@@ -57,10 +57,10 @@ def dict_label(gt_file):
     write_txt(set_val,val_label)
 
 if __name__ == '__main__':
-    gt_file = '../train_data/ppdataset/train/labeltrain.txt'
+    gt_file = '../train_data/ppdataset2.0/LabelTrain.txt'
     baseline_file = '../output/rec/ztl_baseline.txt'
     # val_file = 'labelval.txt'
-    process_label(baseline_file)
+    process_label(gt_file)
     # dict_label(gt_file)
     # strip_label(gt_file)
     # strip_label(val_file)
