@@ -4,7 +4,7 @@ visualdl --logdir="./vdl" --host=172.18.30.123 --port=16006
 #share visual
 python3 -m paddle.distributed.launch --gpus '3'  tools/train.py -c configs/rec/ztl_config_exp/ztl_mv3_tps_bilstm_ctc.yml
 #run train
-python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '3,4,5,6,7'  tools/train.py -c configs/rec/ztl_config_exp/ztl_mv3_tps_bilstm_ctc.yml
+python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '2,3,4,5,6,7'  tools/train.py -c configs/rec/ztl_config_exp/ztl_mv3_tps_bilstm_ctc.yml
 
 #export model
 python3 tools/export_model.py -c output/rec/ztl_500_mv_l_d_trans_2_80_160/config.yml \
