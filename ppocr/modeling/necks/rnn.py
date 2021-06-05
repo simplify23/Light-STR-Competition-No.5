@@ -21,7 +21,7 @@ import paddle
 import numpy as np
 from ppocr.modeling.backbones.det_mobilenet_v3 import ConvBNLayer
 from ppocr.modeling.heads.rec_ctc_head import get_para_bias_attr
-from ppocr.modeling.heads.self_attention import WrapEncoderForFeature
+from ppocr.modeling.heads.self_attention import WrapEncoderForFeature, MixerPatch
 
 
 class Im2Seq(nn.Layer):
@@ -34,7 +34,47 @@ class Im2Seq(nn.Layer):
         assert H == 1
         x = x.squeeze(axis=2)
         x = x.transpose([0, 2, 1])  # (NTC)(batch, width, channels)
-        return x
+        return x,H*W
+
+class Im2Seq_downsample(nn.Layer):
+    def __init__(self, in_channels, out_channels=80, patch=2*160, **kwargs):
+        super().__init__()
+        self.out_channels = out_channels
+        self.patch = patch
+        self.conv1 = ConvBNLayer(
+            in_channels=in_channels,
+            out_channels= self.out_channels, #make_divisible(scale * cls_ch_squeeze), #160
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            groups=1,
+            if_act=True,
+            act='hardswish',
+            name='conv_patch')
+        # self.mixer = MixerPatch(
+        #     d_hidden=in_channels,
+        #     d_hidden_out=self.out_channels,
+        #     d_patch=self.patch,
+        #     d_patch_scale=2,
+        #     d_patch_out= self.patch//4,
+        #     prepostprocess_dropout=0.1,
+        #     relu_dropout=0.1)
+        self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+    def forward(self, x):
+        # print(x.shape)
+        x = self.pool(x)
+        conv_out = self.conv1(x)
+        B, C, H, W = conv_out.shape
+        conv_out = paddle.reshape(x=conv_out, shape=[-1, C, H*W])
+        # conv_out = conv_out.squeeze(axis=2)
+        conv_out = conv_out.transpose([0, 2, 1])
+        # print(conv_out.shape)
+
+        # mixer_out = self.mixer(x)
+        # mixer(in-out)  b w*h c
+        # out = conv_out+mixer_out # (NTC)(batch, width, channels)
+        out = conv_out
+        return out,H*W
 
 class TransformerPosEncoder(nn.Layer):
     def __init__(self,  max_text_length=35, num_heads=8,
@@ -57,7 +97,7 @@ class TransformerPosEncoder(nn.Layer):
             d_value=int(self.hidden_dims / self.num_heads),
             d_model=self.hidden_dims,
             # channel mix for double 256
-            d_inner_hid=self.hidden_dims*3, #2,
+            d_inner_hid=self.hidden_dims*2, #2,
             prepostprocess_dropout=0.1,
             attention_dropout=0.1,
             relu_dropout=0.1,
@@ -75,11 +115,11 @@ class TransformerPosEncoder(nn.Layer):
         return out
 
 class EncoderWithTrans(nn.Layer):
-    def __init__(self, in_channels, hidden_size,num_layers = 2):
+    def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithTrans, self).__init__()
         self.out_channels = hidden_size * 3 #2
         self.custom_channel = hidden_size
-        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers)
+        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
         # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
         self.up_linear = EncoderWithFC(self.custom_channel,self.out_channels,'up_encoder')
 
@@ -92,7 +132,7 @@ class EncoderWithTrans(nn.Layer):
         return x
 
 class EncoderWithRNN(nn.Layer):
-    def __init__(self, in_channels, hidden_size,num_layers = 2):
+    def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithRNN, self).__init__()
         self.out_channels = hidden_size * 2
         self.lstm = nn.LSTM(
@@ -104,7 +144,7 @@ class EncoderWithRNN(nn.Layer):
 
 
 class EncoderWithFC(nn.Layer):
-    def __init__(self, in_channels, hidden_size,name='reduce_encoder_fea',num_layers=1):
+    def __init__(self, in_channels, hidden_size,name='reduce_encoder_fea',num_layers=1,patch = 80):
         super(EncoderWithFC, self).__init__()
         self.out_channels = hidden_size
         weight_attr, bias_attr = get_para_bias_attr(
@@ -123,9 +163,13 @@ class EncoderWithFC(nn.Layer):
 
 
 class SequenceEncoder(nn.Layer):
-    def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,**kwargs):
+    def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,img2seq='origin',**kwargs):
         super(SequenceEncoder, self).__init__()
-        self.encoder_reshape = Im2Seq(in_channels)
+        self.patch = 80*4
+        if img2seq == 'cnn+mixer':
+            self.encoder_reshape = Im2Seq_downsample(in_channels)
+        else:
+            self.encoder_reshape = Im2Seq(in_channels)
         self.out_channels = self.encoder_reshape.out_channels
         self.encoder_type = encoder_type
         if encoder_type == 'reshape':
@@ -152,13 +196,13 @@ class SequenceEncoder(nn.Layer):
                 encoder_type, support_encoder_dict.keys())
 
             self.encoder = support_encoder_dict[encoder_type](
-                self.encoder_reshape.out_channels, hidden_size,num_layers)
+                self.encoder_reshape.out_channels, hidden_size,num_layers,self.patch)
             self.out_channels = self.encoder.out_channels
             self.only_reshape = False
 
     def forward(self, x):
         if self.encoder_type!= 'cnn':
-            x = self.encoder_reshape(x)
+            x,self.patch = self.encoder_reshape(x)
         if not self.only_reshape:
             x = self.encoder(x)
         return x

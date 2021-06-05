@@ -113,7 +113,10 @@ def test_model(model):
         model,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None,3,32,320], dtype='float32')
+                # SRN transform 64 size
+                shape=[None,1,64,640], dtype='float32')
+                # # CRNN 32 size
+                # shape=[None,3,32,320], dtype='float32')
         ])
     print(model)
     paddle.jit.save(model, save_path)

@@ -221,7 +221,7 @@ class EncoderLayer(nn.Layer):
                                             attention_dropout)
         elif atten_method == 'Mixer':
             # 32 is w*h
-            self.self_attn = MixerBlock(t_shape*4, t_shape, relu_dropout)
+            self.self_attn = MixerBlock(t_shape*4, t_shape, t_shape, relu_dropout)
         self.postprocesser1 = PrePostProcessLayer(postprocess_cmd, d_model,
                                                   prepostprocess_dropout)
 
@@ -242,6 +242,44 @@ class EncoderLayer(nn.Layer):
         ffn_output = self.postprocesser2(ffn_output, attn_output)
         return ffn_output
 
+class MixerPatch(nn.Layer):
+    """
+    for img2seq mixerpatch
+    """
+
+    def __init__(self,
+                 d_hidden,
+                 d_hidden_out,
+                 d_patch,
+                 d_patch_scale,
+                 d_patch_out,
+                 prepostprocess_dropout,
+                 relu_dropout,
+                 preprocess_cmd="n",
+                 postprocess_cmd="da"):
+
+        super(MixerPatch, self).__init__()
+        self.preprocesser1 = PrePostProcessLayer(preprocess_cmd, d_hidden,
+                                                 prepostprocess_dropout)
+        self.ffn = paddle.nn.Linear(
+            in_features=d_hidden, out_features=d_hidden_out)
+        self.act = paddle.nn.GELU()
+        # self.postprocesser1 = PrePostProcessLayer(postprocess_cmd, d_hidden_out,
+        #                                           prepostprocess_dropout)
+
+        self.preprocesser2 = PrePostProcessLayer(preprocess_cmd, d_hidden_out,
+                                                 prepostprocess_dropout)
+        self.mixer_patch = MixerBlock(d_patch_scale*d_patch, d_patch, d_patch_out, relu_dropout)
+        # self.postprocesser2 = PrePostProcessLayer(postprocess_cmd, d_hidden_out,
+        #                                           prepostprocess_dropout)
+
+    def forward(self, enc_input):
+        enc_input = self.preprocesser1(enc_input)
+        enc_input = self.act(self.ffn(enc_input))
+        # attn_output = self.postprocesser1(attn_output, enc_input)
+        ffn_output = self.mixer_patch(self.preprocesser2(enc_input))
+        # ffn_output = self.postprocesser2(ffn_output, enc_input)
+        return ffn_output
 
 class MultiHeadAttention(nn.Layer):
     """
@@ -463,26 +501,29 @@ class FFN(nn.Layer):
         return out
 
 class MixerBlock(nn.Layer):
-    def __init__(self, d_inner_hid, d_model, dropout_rate):
+    def __init__(self, d_inner_hid, d_model, d_out, dropout_rate):
         super(MixerBlock, self).__init__()
         self.dropout_rate = dropout_rate
         self.act = paddle.nn.GELU()
         self.fc1 = paddle.nn.Linear(
             in_features=d_model, out_features=d_inner_hid)
         self.fc2 = paddle.nn.Linear(
-            in_features=d_inner_hid, out_features=d_model)
+            in_features=d_inner_hid, out_features=d_out)
+        self.fctest = paddle.nn.Linear(
+            in_features=d_model, out_features=d_out)
 
     def forward(self, x):
         # x: b w*h c
         x = paddle.transpose(x, perm=[0, 2, 1])
-        hidden = self.fc1(x)
+        hidden = self.fctest(x)
+        # hidden = self.fc1(x)
         hidden = self.act(hidden)
         if self.dropout_rate:
             hidden = F.dropout(
                 hidden, p=self.dropout_rate, mode="downscale_in_infer")
-        out = self.fc2(hidden)
-        out = paddle.transpose(out, perm=[0, 2, 1])
-        return out
+        # hidden = self.fc2(hidden)
+        hidden = paddle.transpose(hidden, perm=[0, 2, 1])
+        return hidden
 
 class SpatialGatingUnit(nn.Layer):
     def __init__(self, dim, dim_seq):
