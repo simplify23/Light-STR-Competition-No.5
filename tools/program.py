@@ -34,7 +34,7 @@ from ppocr.utils.utility import print_dict
 from ppocr.utils.logging import get_logger
 from ppocr.data import build_dataloader
 import numpy as np
-
+import random
 
 class ArgsParser(ArgumentParser):
     def __init__(self):
@@ -215,6 +215,10 @@ def train(config,
     model.train()
 
     use_srn = config['Architecture']['algorithm'] == "SRN"
+    if 'mix_up' in config['Global']:
+        mix_up_prob = config['Global']['mix_up']
+    else:
+        mix_up_prob = 0
 
     if 'start_epoch' in best_model_dict:
         start_epoch = best_model_dict['start_epoch']
@@ -237,13 +241,36 @@ def train(config,
                 break
             lr = optimizer.get_lr()
             images = batch[0]
+            use_mix_up = random.random() <= mix_up_prob
+            if use_mix_up:
+                batch_mixed = []
+                alpha = 0.5
+                batch_size = images.shape[0]
+                lam = np.random.beta(alpha, alpha)
+                index = np.random.permutation(np.arange(batch_size))
+                images = images.numpy()
+                images = lam * images + (1 - lam) * images[index, :, :, :]
+                images = paddle.to_tensor(images)
+                batch_mixed.append(images)
+                labels = batch[1].numpy()
+                batch_mixed.append(paddle.to_tensor(labels[index]))
+                label_lengths = batch[2].numpy()
+                batch_mixed.append(paddle.to_tensor(label_lengths[index]))
+
             if use_srn:
                 others = batch[-4:]
                 preds = model(images, others)
                 model_average = True
             else:
                 preds = model(images)
-            loss = loss_class(preds, batch)
+
+            if use_mix_up:
+                loss1 = loss_class(preds, batch)
+                loss2 = loss_class(preds, batch_mixed)
+                loss = {'loss': lam * loss1['loss'] + (1-lam) * loss2['loss']}
+            else:
+                loss = loss_class(preds, batch)
+
             avg_loss = loss['loss']
             avg_loss.backward()
             optimizer.step()

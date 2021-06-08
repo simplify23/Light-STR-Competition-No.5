@@ -62,6 +62,25 @@ def save_error_image(pred_dict,args):
                         cv2.imwrite(image_error_file+key, img)
         return
 
+def save_acc_image(acc_list, args):
+    if args.acc_save_path == None:
+        return
+    else:
+        if not os.path.exists(args.acc_save_path):
+            os.makedirs(args.acc_save_path)
+        acc_file =args.acc_save_path
+        acc_list_file = acc_file + 'acc_list.txt'
+        with open(acc_list_file, 'w') as f:
+            acc_list = sorted(acc_list, key=lambda x: x[2])
+            for each in acc_list:
+                name = cut_path_file(each[0])
+                acc = round(each[2], 4)
+                s = "{}\t{}\t{}\n".format(name, each[1], acc)
+                f.writelines(s)
+                img = cv2.imread(each[0])
+                cv2.imwrite(acc_file + name, img)
+
+
 class TextRecognizer(object):
     def __init__(self, args):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
@@ -70,6 +89,7 @@ class TextRecognizer(object):
         self.rec_algorithm = args.rec_algorithm
         self.max_text_length = args.max_text_length
         self.save_path = args.rec_save_path
+        self.use_srn_resize = args.use_srn_resize
         postprocess_params = {
             'name': 'CTCLabelDecode',
             "character_type": args.rec_char_type,
@@ -112,6 +132,26 @@ class TextRecognizer(object):
         resized_image /= 0.5
         padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
         padding_im[:, :, 0:resized_w] = resized_image
+        return padding_im
+
+    def resize_norm_img_ex(self, img, image_shape):
+        imgC, imgH, imgW = image_shape
+
+        im_hei = img.shape[0]
+        im_wid = img.shape[1]
+        new_wid = imgW
+        if im_wid <= im_hei * 1:
+            new_wid = imgH
+        elif im_wid <= im_hei * 2:
+            new_wid = imgH * 2
+        elif im_wid <= im_hei * 3:
+            new_wid = imgH * 3
+        elif im_wid <= im_hei * 4:
+            new_wid = imgH * 4
+        img_new = cv2.resize(img, (new_wid, imgH))
+        img_new = img_new.transpose((2, 0, 1))
+        padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+        padding_im[:, :, 0:new_wid] = img_new
         return padding_im
 
     def resize_norm_img_srn(self, img, image_shape):
@@ -210,8 +250,11 @@ class TextRecognizer(object):
                 max_wh_ratio = max(max_wh_ratio, wh_ratio)
             for ino in range(beg_img_no, end_img_no):
                 if self.rec_algorithm != "SRN":
-                    norm_img = self.resize_norm_img(img_list[indices[ino]],
-                                                    max_wh_ratio)
+                    if self.use_srn_resize:
+                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], [3, 64, 640])
+                    else:
+                        norm_img = self.resize_norm_img(img_list[indices[ino]],
+                                                        max_wh_ratio)
                     norm_img = norm_img[np.newaxis, :]
                     norm_img_batch.append(norm_img)
                 else:
@@ -283,6 +326,8 @@ def main(args):
     valid_image_file_list = []
     img_list = []
     pred_dict= {}
+
+    acc_list = []
     with open(args.rec_save_path, "w") as fout:
         for idx, image_file in enumerate(image_file_list):
             img, flag = check_and_read_gif(image_file)
@@ -311,6 +356,8 @@ def main(args):
                 for ino in range(len(img_list)):
                     logger.info("Predicts of {}:{}".format(valid_image_file_list[
                         ino], rec_res[ino]))
+                    if rec_res[ino][1] < 0.99:
+                        acc_list.append([valid_image_file_list[ino], rec_res[ino][0], rec_res[ino][1]])
                     fout.write(cut_path_file(valid_image_file_list[ino]) + "\t" + rec_res[ino][0] + "\n")
                     pred_dict[cut_path_file(valid_image_file_list[ino])]=rec_res[ino][0]
                     # print(pred_dict)
@@ -319,6 +366,7 @@ def main(args):
                 img_list = []
     # print(pred_dict)
     save_error_image(pred_dict,args)
+    save_acc_image(acc_list, args)
     logger.info("Total predict time for {} images, cost: {:.3f}".format(
         total_images_num, total_run_time))
 
