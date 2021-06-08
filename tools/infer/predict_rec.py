@@ -62,6 +62,25 @@ def save_error_image(pred_dict,args):
                         cv2.imwrite(image_error_file+key, img)
         return
 
+def save_acc_image(acc_list, args):
+    if args.acc_save_path == None:
+        return
+    else:
+        if not os.path.exists(args.acc_save_path):
+            os.makedirs(args.acc_save_path)
+        acc_file =args.acc_save_path
+        acc_list_file = acc_file + 'acc_list.txt'
+        with open(acc_list_file, 'w') as f:
+            acc_list = sorted(acc_list, key=lambda x: x[2])
+            for each in acc_list:
+                name = cut_path_file(each[0])
+                acc = round(each[2], 4)
+                s = "{}\t{}\t{}\n".format(name, each[1], acc)
+                f.writelines(s)
+                img = cv2.imread(each[0])
+                cv2.imwrite(acc_file + name, img)
+
+
 class TextRecognizer(object):
     def __init__(self, args):
         self.rec_image_shape = [int(v) for v in args.rec_image_shape.split(",")]
@@ -307,6 +326,8 @@ def main(args):
     valid_image_file_list = []
     img_list = []
     pred_dict= {}
+
+    acc_list = []
     with open(args.rec_save_path, "w") as fout:
         for idx, image_file in enumerate(image_file_list):
             img, flag = check_and_read_gif(image_file)
@@ -335,6 +356,8 @@ def main(args):
                 for ino in range(len(img_list)):
                     logger.info("Predicts of {}:{}".format(valid_image_file_list[
                         ino], rec_res[ino]))
+                    if rec_res[ino][1] < 0.99:
+                        acc_list.append([valid_image_file_list[ino], rec_res[ino][0], rec_res[ino][1]])
                     fout.write(cut_path_file(valid_image_file_list[ino]) + "\t" + rec_res[ino][0] + "\n")
                     pred_dict[cut_path_file(valid_image_file_list[ino])]=rec_res[ino][0]
                     # print(pred_dict)
@@ -343,6 +366,7 @@ def main(args):
                 img_list = []
     # print(pred_dict)
     save_error_image(pred_dict,args)
+    save_acc_image(acc_list, args)
     logger.info("Total predict time for {} images, cost: {:.3f}".format(
         total_images_num, total_run_time))
 

@@ -106,6 +106,10 @@ def parse_args():
     parser.add_argument("--total_process_num", type=int, default=1)
     parser.add_argument("--process_id", type=int, default=0)
 
+    parser.add_argument("--use_srn_resize", type=str2bool, default=False)
+    #统计置信度低于0.99的测试集
+    parser.add_argument("--acc_save_path", type=str)
+
     return parser.parse_args()
 
 
