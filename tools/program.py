@@ -215,9 +215,11 @@ def train(config,
     model.train()
 
     use_srn = config['Architecture']['algorithm'] == "SRN"
-    mix_up_prob = config['Global']['mix_up']
-    if mix_up_prob is None:
+    if 'mix_up' in config['Global']:
+        mix_up_prob = config['Global']['mix_up']
+    else:
         mix_up_prob = 0
+
     if 'start_epoch' in best_model_dict:
         start_epoch = best_model_dict['start_epoch']
     else:
