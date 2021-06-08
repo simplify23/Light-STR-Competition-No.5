@@ -3,7 +3,7 @@ Global:
   epoch_num: 500
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/ztl_500_mv_gmlp_4_trans_4_960 # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/ztl_500_gmlp_trans_conv2d_320 # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
@@ -20,7 +20,7 @@ Global:
   infer_mode: False
   use_space_char: True
   save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
-  count_model: False
+  count_model: True
 
 
 
@@ -80,7 +80,7 @@ Train:
   dataset:
     name: SimpleDataSet
     data_dir: ./train_data/
-    label_file_list: ["./dataset/train/labeltrain.txt"]
+    label_file_list: ["./train_data/ppdataset/train/labeltrain.txt"]
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
@@ -90,7 +90,7 @@ Train:
           aug_prob: 0.4
       - CTCLabelEncode: # Class handling label
       - SRNRecResizeImg:
-          image_shape: [3, 96,960]
+          image_shape: [3, 96, 960]
           max_text_length: 35
           num_heads: 8
 #      - RecResizeImg:
@@ -107,14 +107,14 @@ Eval:
   dataset:
     name: SimpleDataSet
     data_dir: ./train_data
-    label_file_list: ["./dataset/train/labelval.txt"]
+    label_file_list: ["./train_data/ppdataset/train/labelval.txt"]
     transforms:
       - DecodeImage: # load image
           img_mode: BGR
           channel_first: False
       - CTCLabelEncode: # Class handling label
       - SRNRecResizeImg:
-          image_shape: [3, 96,960]
+          image_shape: [3, 96, 960]
           max_text_length: 35
           num_heads: 8
 #      - RecResizeImg:

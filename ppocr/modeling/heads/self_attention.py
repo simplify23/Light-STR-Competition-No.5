@@ -43,9 +43,10 @@ class WrapEncoderForFeature(nn.Layer):
                  preprocess_cmd,
                  postprocess_cmd,
                  weight_sharing,
+                 dim_seq = 80,
                  bos_idx=0):
         super(WrapEncoderForFeature, self).__init__()
-        t_shape = 32
+        t_shape = dim_seq
         self.prepare_encoder = PrepareEncoder(
             src_vocab_size,
             d_model,
@@ -131,15 +132,26 @@ class Encoder(nn.Layer):
         for i in range(n_layer):
             self.encoder_layers.append(
                 self.add_sublayer(
+                    "layer_mlp%d" % i,
+                    gmlp_block(n_head, d_key, d_value, d_model, d_inner_hid,
+                                 prepostprocess_dropout, attention_dropout,
+                                 relu_dropout,  t_shape,atten_method, preprocess_cmd,
+                                 postprocess_cmd,i)))
+        for i in range(n_layer):
+            # self.encoder_layers.append(
+            #     self.add_sublayer(
+            #         "layer_mlp%d" % i,
+            #         gmlp_block(n_head, d_key, d_value, d_model, d_inner_hid,
+            #                    prepostprocess_dropout, attention_dropout,
+            #                    relu_dropout,  t_shape,atten_method, preprocess_cmd,
+            #                    postprocess_cmd,i)))
+            self.encoder_layers.append(
+                self.add_sublayer(
                     "layer_%d" % i,
                     EncoderLayer(n_head, d_key, d_value, d_model, d_inner_hid,
                                  prepostprocess_dropout, attention_dropout,
                                  relu_dropout,  t_shape,atten_method, preprocess_cmd,
                                  postprocess_cmd)))
-                    # gmlp_block(n_head, d_key, d_value, d_model, d_inner_hid,
-                    #              prepostprocess_dropout, attention_dropout,
-                    #              relu_dropout,  t_shape,atten_method, preprocess_cmd,
-                    #              postprocess_cmd,i)))
         self.processer = PrePostProcessLayer(preprocess_cmd, d_model,
                                              prepostprocess_dropout)
 
@@ -164,7 +176,7 @@ class gmlp_block(nn.Layer):
                  prepostprocess_dropout,
                  attention_dropout,
                  relu_dropout,
-                 t_shape=80,
+                 dim_seq=80,
                  atten_method = 'MHA',
                  preprocess_cmd="n",
                  postprocess_cmd="da",
@@ -173,12 +185,13 @@ class gmlp_block(nn.Layer):
         super(gmlp_block, self).__init__()
         self.atten_method = atten_method
         self.ff_dim = d_model *2
+        self.dim_seq = dim_seq
         self.i = i
         self.act = paddle.nn.GELU()
         self.preprocesser1 = PrePostProcessLayer(preprocess_cmd, d_model,
                                                  prepostprocess_dropout)
         self.proj_in = paddle.nn.Linear(in_features=d_model, out_features=self.ff_dim)
-        self.sgu = SpatialGatingUnit(self.ff_dim,dim_seq=80)
+        self.sgu = SpatialGatingUnit(self.ff_dim,dim_seq=self.dim_seq)
         # if self.i==0:
         #     self.proj_out = paddle.nn.Linear(in_features=self.ff_dim//2, out_features=d_model)
         self.postprocesser1 = PrePostProcessLayer(postprocess_cmd, d_model,
@@ -529,6 +542,8 @@ class SpatialGatingUnit(nn.Layer):
     def __init__(self, dim, dim_seq):
         super(SpatialGatingUnit, self).__init__()
         dim_out = dim //2
+        self.head = 8
+        # self.norm = nn.BatchNorm(dim_out)
         self.norm = nn.LayerNorm(
             normalized_shape=dim_out,
             weight_attr=fluid.ParamAttr(
@@ -536,10 +551,25 @@ class SpatialGatingUnit(nn.Layer):
             bias_attr=fluid.ParamAttr(
                 initializer=fluid.initializer.Constant(0.)))
         self.conv1 = nn.Conv1D(dim_seq,dim_seq,1)
+        # self.conv1 = nn.Conv2D(dim_seq,dim_seq,(1,1))
+        # self.norm2 = nn.LayerNorm(
+        #     normalized_shape=dim_out,
+        #     weight_attr=fluid.ParamAttr(
+        #         initializer=fluid.initializer.Constant(1.)),
+        #     bias_attr=fluid.ParamAttr(
+        #         initializer=fluid.initializer.Constant(0.)))
 
     def forward(self, x):
+        B, P, C = x.shape
+        # un-exp idea multi-head
+        # x = paddle.reshape(x=x, shape=[B, P, self.head, C//self.head])
+        # x = paddle.reshape(x=x, shape=[B//self.head, P, self.head,  C])
         res, gate = paddle.chunk(x, chunks=2, axis=-1)
+        # res = norm2(res)
         gate = self.norm(gate)
         gate = self.conv1(gate)
-
-        return gate * res
+        out = gate * res
+        #
+        # out = paddle.reshape(x=out, shape=[B, P, C//2])
+        # out = self.norm2(out)
+        return out

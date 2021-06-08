@@ -65,6 +65,10 @@ class Im2Seq_downsample(nn.Layer):
         x = self.pool(x)
         conv_out = self.conv1(x)
         B, C, H, W = conv_out.shape
+        C = 80
+        H = 1
+        W = 80
+        # print(conv_out.shape)
         conv_out = paddle.reshape(x=conv_out, shape=[-1, C, H*W])
         # conv_out = conv_out.squeeze(axis=2)
         conv_out = conv_out.transpose([0, 2, 1])
@@ -103,7 +107,8 @@ class TransformerPosEncoder(nn.Layer):
             relu_dropout=0.1,
             preprocess_cmd="n",
             postprocess_cmd="da",
-            weight_sharing=True)
+            weight_sharing=True,
+            dim_seq = self.width)
 
     def forward(self, conv_features):
         # feature_dim = conv_features.shape[1]
@@ -117,7 +122,7 @@ class TransformerPosEncoder(nn.Layer):
 class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithTrans, self).__init__()
-        self.out_channels = hidden_size * 3 #2
+        self.out_channels = hidden_size *2 #3
         self.custom_channel = hidden_size
         self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
         # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
@@ -165,7 +170,7 @@ class EncoderWithFC(nn.Layer):
 class SequenceEncoder(nn.Layer):
     def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,img2seq='origin',**kwargs):
         super(SequenceEncoder, self).__init__()
-        self.patch = 80*4
+        self.patch = 80
         if img2seq == 'cnn+mixer':
             self.encoder_reshape = Im2Seq_downsample(in_channels)
         else:
