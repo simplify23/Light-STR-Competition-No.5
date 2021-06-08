@@ -115,7 +115,7 @@ class MobileNetV3(nn.Layer):
             inplanes = make_divisible(scale * c)
             i += 1
         self.blocks = nn.Sequential(*block_list)
-        self.out_channels = 80 #make_divisible(scale * cls_ch_squeeze) #160
+        self.out_channels = inplanes*8 #80 #make_divisible(scale * cls_ch_squeeze) #160
         self.conv2 = ConvBNLayer(
             in_channels=inplanes,
             out_channels= inplanes*8, #make_divisible(scale * cls_ch_squeeze), #160
@@ -126,26 +126,23 @@ class MobileNetV3(nn.Layer):
             if_act=True,
             act='hardswish',
             name='conv_last')
-        self.conv_smooth = ConvBNLayer(
-            in_channels=inplanes*8,
-            out_channels= self.out_channels, #make_divisible(scale * cls_ch_squeeze), #160
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            groups=1,
-            if_act=True,
-            act='hardswish',
-            name='conv_custom')
-        self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
-        self.pool_ex = nn.MaxPool2D(kernel_size=4, stride=4, padding=0)
+        # self.conv_smooth = ConvBNLayer(
+        #     in_channels=inplanes*8,
+        #     out_channels= self.out_channels, #make_divisible(scale * cls_ch_squeeze), #160
+        #     kernel_size=1,
+        #     stride=1,
+        #     padding=0,
+        #     groups=1,
+        #     if_act=True,
+        #     act='hardswish',
+        #     name='conv_custom')
+        # self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.blocks(x)
         x = self.conv2(x)
-        if x.shape[2] <= 2:
-            x = self.pool(x)
-        else:
-            x = self.pool_ex(x)
-        x = self.conv_smooth(x)
+        # x = self.pool(x)
+        # x = self.conv_smooth(x)
+        # print(x.shape)
         return x
