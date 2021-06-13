@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle import nn
+from paddle import nn,fluid
 
 from ppocr.modeling.backbones.det_mobilenet_v3 import ResidualUnit, ConvBNLayer, make_divisible
 
-__all__ = ['MobileNetV3']
+__all__ = ['Backbone']
 
 
-class MobileNetV3(nn.Layer):
+class Backbone(nn.Layer):
     def __init__(self,
                  in_channels=1,
                  model_name='small',
@@ -45,10 +45,10 @@ class MobileNetV3(nn.Layer):
         if model_name == "large":
             cfg = [
                 # k, exp, c,  se,     nl,  s,
-                [3, 16, 16, False, 'relu', large_stride[0]],
-                [3, 64, 24, False, 'relu', (large_stride[1], 1)],
+                [3, 16, 16, False, 'relu', large_stride[0]],   #8*80 //16*160
+                [3, 64, 24, False, 'relu', (large_stride[1], 1)], #4*80 //8*160
                 [3, 72, 24, False, 'relu', 1],
-                [5, 72, 40, True, 'relu', (large_stride[2], 1)],
+                [5, 72, 40, True, 'relu', (large_stride[2], 1)], #
                 [5, 120, 40, True, 'relu', 1],
                 [5, 120, 40, True, 'relu', 1],
                 [3, 240, 80, False, 'hardswish', 1],
@@ -60,6 +60,15 @@ class MobileNetV3(nn.Layer):
                 [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
                 [5, 960, 160, True, 'hardswish', 1],
                 [5, 960, 160, True, 'hardswish', 1],
+            ]
+            cfg_u_net = [
+                [3, 64, 24, False, 'relu', (large_stride[1], 1)], #4*80 //8*160
+                [3, 72, 24, False, 'relu', 1],
+                [5, 72, 40, True, 'relu', (large_stride[2], 1)], #
+                [5, 120, 40, True, 'relu', 1],
+                [3, 240, 80, True, 'hardswish', 1],
+                [3, 200, 80, True, 'hardswish', 1],
+                [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
             ]
             cls_ch_squeeze = 960
         elif model_name == "large-64":
@@ -103,8 +112,8 @@ class MobileNetV3(nn.Layer):
                                       "_model] is not implemented!")
 
         supported_scale = [0.35, 0.5, 0.75, 1.0, 1.25]
-        # assert scale in supported_scale, \
-        #     "supported scales are {} but input scale is {}".format(supported_scale, scale)
+        assert scale in supported_scale, \
+            "supported scales are {} but input scale is {}".format(supported_scale, scale)
 
         inplanes = 16
         # conv1
@@ -134,7 +143,17 @@ class MobileNetV3(nn.Layer):
                     name='conv' + str(i + 2)))
             inplanes = make_divisible(scale * c)
             i += 1
-        self.blocks = nn.Sequential(*block_list)
+        self.blocks = nn.ParameterList(*block_list)
+        self.up1 = nn.Conv2DTranspose(in_channels=480,
+                                        out_channels=240,
+                                        kernel_size=3,
+                                        stride=(2, 1),
+                                        padding=(1, 1))
+        self.up2 = nn.Conv2DTranspose(in_channels=240,
+                                         out_channels=120,
+                                         kernel_size=3,
+                                         stride=(2, 1),
+                                         padding=(1, 1))
         self.out_channels = inplanes*8 # make_divisible(scale * cls_ch_squeeze)# #80 # #160
         self.conv2 = ConvBNLayer(
             in_channels=inplanes,
@@ -161,7 +180,9 @@ class MobileNetV3(nn.Layer):
     def forward(self, x):
         # print(x.shape)
         x = self.conv1(x)
-        x = self.blocks(x)
+        for i,n in enumerate(self.blocks):
+            if i!=3 and i!=5:
+                x = n(x)
         x = self.conv2(x)
         # x = self.pool(x)
         # x = self.conv_smooth(x)
