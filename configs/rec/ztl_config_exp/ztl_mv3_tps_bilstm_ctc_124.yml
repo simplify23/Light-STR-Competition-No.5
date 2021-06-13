@@ -3,13 +3,13 @@ Global:
   epoch_num: 500
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/ztl_500_mv_gmlp_4_trans_4_960 # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/ztl_500_mv_1.25_trans_4_240 # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
   cal_metric_during_train: True
   pretrained_model:
-  checkpoints:
+  checkpoints: ./output/rec/ztl_500_mv_1.25_trans_4_240/iter_epoch_200
   save_inference_dir:
   use_visualdl: True
   infer_img: doc/imgs_words/ch/word_1.jpg
@@ -21,6 +21,7 @@ Global:
   use_space_char: True
   save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
   count_model: False
+  mix_up: 0.4
 
 
 
@@ -38,28 +39,29 @@ Optimizer:
 Architecture:
   model_type: rec
   algorithm: CRNN
-  in_channels: 1
-#  Transform:
-#    name: TPS
-#    num_fiducial: 12
-#    loc_lr: 0.1
-#    model_name: small
+  in_channels: 3
+  #  Transform:
+  #    name: TPS
+  #    num_fiducial: 12
+  #    loc_lr: 0.1
+  #    model_name: small
   Backbone:
     name: MobileNetV3
-    scale: 0.5
-    model_name: large-64
-#  Backbone:
-#    name: ResNet
-#    layers: 18
-#  Backbone:
-#    name: MobileNetV3
-#    scale: 0.5
-#    model_name: small
-#    small_stride: [1, 2, 2, 2]
+    scale: 1.25
+    model_name: large
+  #  Backbone:
+  #    name: ResNet
+  #    layers: 18
+  #  Backbone:
+  #    name: MobileNetV3
+  #    scale: 0.5
+  #    model_name: small
+  #    small_stride: [1, 2, 2, 2]
   Neck:
     name: SequenceEncoder
     encoder_type: transformer
-    hidden_size: 80
+    hidden_size: 240
+    patch: 80
     num_layers : 4
     img2seq: cnn+mixer
   Head:
@@ -89,17 +91,19 @@ Train:
           use_tia: True
           aug_prob: 0.4
       - CTCLabelEncode: # Class handling label
-      - SRNRecResizeImg:
-          image_shape: [3, 96,960]
-          max_text_length: 35
-          num_heads: 8
-#      - RecResizeImg:
-#          image_shape: [3, 32, 320]
+      #      - SRNRecResizeImg:
+      #          image_shape: [3, 64, 640]
+      #          max_text_length: 35
+      #          num_heads: 8
+      #      - RecResizeImg:
+      #          image_shape: [3, 32, 320]
+      - SRNRecResizeImgEx:
+          image_shape: [ 3, 64, 640 ]
       - KeepKeys:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 48
+    batch_size_per_card: 20
     drop_last: True
     num_workers: 8
 
@@ -113,16 +117,18 @@ Eval:
           img_mode: BGR
           channel_first: False
       - CTCLabelEncode: # Class handling label
-      - SRNRecResizeImg:
-          image_shape: [3, 96,960]
-          max_text_length: 35
-          num_heads: 8
-#      - RecResizeImg:
-#          image_shape: [3, 32, 320]
+      #      - SRNRecResizeImg:
+      #          image_shape: [3, 64, 640]
+      #          max_text_length: 35
+      #          num_heads: 8
+      #      - RecResizeImg:
+      #          image_shape: [3, 32, 320]
+      - SRNRecResizeImgEx:
+          image_shape: [3, 64, 640]
       - KeepKeys:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 48
+    batch_size_per_card: 20
     num_workers: 8

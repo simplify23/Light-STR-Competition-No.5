@@ -59,20 +59,19 @@ class Im2Seq_downsample(nn.Layer):
         #     d_patch_out= self.patch//4,
         #     prepostprocess_dropout=0.1,
         #     relu_dropout=0.1)
+        # self.pool = nn.MaxPool2D(kernel_size=4, stride=4, padding=0)
         self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
     def forward(self, x):
         # print(x.shape)
         x = self.pool(x)
         conv_out = self.conv1(x)
         B, C, H, W = conv_out.shape
-        C = 80
-        H = 1
-        W = 80
-        # print(conv_out.shape)
-        conv_out = paddle.reshape(x=conv_out, shape=[-1, C, H*W])
+        # C = 240
+        # H = 1
+        # W = 80
+        conv_out = paddle.reshape(x=conv_out, shape=[-1, self.out_channels, self.patch])
         # conv_out = conv_out.squeeze(axis=2)
         conv_out = conv_out.transpose([0, 2, 1])
-        # print(conv_out.shape)
 
         # mixer_out = self.mixer(x)
         # mixer(in-out)  b w*h c
@@ -122,7 +121,7 @@ class TransformerPosEncoder(nn.Layer):
 class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithTrans, self).__init__()
-        self.out_channels = hidden_size *2 #3
+        self.out_channels = hidden_size *2 # 3 #2
         self.custom_channel = hidden_size
         self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
         # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
@@ -168,11 +167,11 @@ class EncoderWithFC(nn.Layer):
 
 
 class SequenceEncoder(nn.Layer):
-    def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,img2seq='origin',**kwargs):
+    def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,patch = 120, img2seq='origin',**kwargs):
         super(SequenceEncoder, self).__init__()
-        self.patch = 80
+        self.patch = patch
         if img2seq == 'cnn+mixer':
-            self.encoder_reshape = Im2Seq_downsample(in_channels)
+            self.encoder_reshape = Im2Seq_downsample(in_channels,hidden_size,self.patch)
         else:
             self.encoder_reshape = Im2Seq(in_channels)
         self.out_channels = self.encoder_reshape.out_channels

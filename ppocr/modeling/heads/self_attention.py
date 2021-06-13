@@ -129,14 +129,14 @@ class Encoder(nn.Layer):
         super(Encoder, self).__init__()
         atten_method ='MHA'
         self.encoder_layers = list()
-        for i in range(n_layer):
-            self.encoder_layers.append(
-                self.add_sublayer(
-                    "layer_mlp%d" % i,
-                    gmlp_block(n_head, d_key, d_value, d_model, d_inner_hid,
-                                 prepostprocess_dropout, attention_dropout,
-                                 relu_dropout,  t_shape,atten_method, preprocess_cmd,
-                                 postprocess_cmd,i)))
+        # for i in range(n_layer-2): #layer-2
+        #     self.encoder_layers.append(
+        #         self.add_sublayer(
+        #             "layer_mlp%d" % i,
+        #             gmlp_block(n_head, d_key, d_value, d_model, d_inner_hid,
+        #                          prepostprocess_dropout, attention_dropout,
+        #                          relu_dropout,  t_shape,atten_method, preprocess_cmd,
+        #                          postprocess_cmd,i)))
         for i in range(n_layer):
             # self.encoder_layers.append(
             #     self.add_sublayer(
@@ -552,12 +552,18 @@ class SpatialGatingUnit(nn.Layer):
                 initializer=fluid.initializer.Constant(0.)))
         self.conv1 = nn.Conv1D(dim_seq,dim_seq,1)
         # self.conv1 = nn.Conv2D(dim_seq,dim_seq,(1,1))
-        # self.norm2 = nn.LayerNorm(
-        #     normalized_shape=dim_out,
-        #     weight_attr=fluid.ParamAttr(
-        #         initializer=fluid.initializer.Constant(1.)),
-        #     bias_attr=fluid.ParamAttr(
-        #         initializer=fluid.initializer.Constant(0.)))
+        self.norm2 = nn.LayerNorm(
+            normalized_shape=dim_out,
+            weight_attr=fluid.ParamAttr(
+                initializer=fluid.initializer.Constant(1.)),
+            bias_attr=fluid.ParamAttr(
+                initializer=fluid.initializer.Constant(0.)))
+        self.norm3 = nn.LayerNorm(
+            normalized_shape=dim_out,
+            weight_attr=fluid.ParamAttr(
+                initializer=fluid.initializer.Constant(1.)),
+            bias_attr=fluid.ParamAttr(
+                initializer=fluid.initializer.Constant(0.)))
 
     def forward(self, x):
         B, P, C = x.shape
@@ -565,11 +571,12 @@ class SpatialGatingUnit(nn.Layer):
         # x = paddle.reshape(x=x, shape=[B, P, self.head, C//self.head])
         # x = paddle.reshape(x=x, shape=[B//self.head, P, self.head,  C])
         res, gate = paddle.chunk(x, chunks=2, axis=-1)
-        # res = norm2(res)
+        res = self.norm2(res)
         gate = self.norm(gate)
         gate = self.conv1(gate)
         out = gate * res
-        #
+        # out = F.dropout(
+        #     out, p=0.1, mode="downscale_in_infer")
         # out = paddle.reshape(x=out, shape=[B, P, C//2])
-        # out = self.norm2(out)
+        out = self.norm3(out)
         return out
