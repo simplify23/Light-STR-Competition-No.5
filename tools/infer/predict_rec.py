@@ -137,7 +137,7 @@ class TextRecognizer(object):
 
     def resize_norm_img_ex(self, img, image_shape):
         imgC, imgH, imgW = image_shape
-        print("resize_norm_img_ex : ", image_shape)
+        #print("resize_norm_img_ex : ", image_shape)
         im_hei = img.shape[0]
         im_wid = img.shape[1]
         new_wid = imgW
