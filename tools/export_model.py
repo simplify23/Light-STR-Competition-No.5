@@ -70,7 +70,7 @@ def main():
     else:
         infer_shape = [3, -1, -1]
         if config['Architecture']['model_type'] == "rec":
-            infer_shape = [3, 64, -1 ] # for rec model, H must be 32
+            infer_shape = [3, 96, 960 ] # for rec model, H must be 32
             if 'Transform' in config['Architecture'] and config['Architecture'][
                     'Transform'] is not None and config['Architecture'][
                         'Transform']['name'] == 'TPS':

@@ -3,13 +3,13 @@ Global:
   epoch_num: 500
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/ztl_500_mv_1.25_trans_4_240 # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/ztl_500_umv_se_trans_4_640 # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
   cal_metric_during_train: True
   pretrained_model:
-  checkpoints: ./output/rec/ztl_500_mv_1.25_trans_4_240/iter_epoch_200
+  checkpoints:
   save_inference_dir:
   use_visualdl: True
   infer_img: doc/imgs_words/ch/word_1.jpg
@@ -31,7 +31,7 @@ Optimizer:
   beta2: 0.999
   lr:
     name: Cosine
-    learning_rate: 0.001
+    learning_rate: 0.0004
   regularizer:
     name: 'L2'
     factor: 0.00001
@@ -46,8 +46,8 @@ Architecture:
   #    loc_lr: 0.1
   #    model_name: small
   Backbone:
-    name: MobileNetV3
-    scale: 1.25
+    name: UMobileNetV3
+    scale: 0.5
     model_name: large
   #  Backbone:
   #    name: ResNet
@@ -60,7 +60,7 @@ Architecture:
   Neck:
     name: SequenceEncoder
     encoder_type: transformer
-    hidden_size: 240
+    hidden_size: 80
     patch: 80
     num_layers : 4
     img2seq: cnn+mixer
@@ -103,7 +103,7 @@ Train:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 20
+    batch_size_per_card: 38
     drop_last: True
     num_workers: 8
 
@@ -130,5 +130,5 @@ Eval:
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 20
+    batch_size_per_card: 38
     num_workers: 8

@@ -251,7 +251,7 @@ class TextRecognizer(object):
             for ino in range(beg_img_no, end_img_no):
                 if self.rec_algorithm != "SRN":
                     if self.use_srn_resize:
-                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], [3, 32, 320])
+                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], [3, 96, 960])
                     else:
                         norm_img = self.resize_norm_img(img_list[indices[ino]],
                                                         max_wh_ratio)

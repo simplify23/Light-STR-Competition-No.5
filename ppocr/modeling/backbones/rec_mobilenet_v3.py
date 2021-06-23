@@ -53,8 +53,8 @@ class MobileNetV3(nn.Layer):
                 [5, 120, 40, True, 'relu', 1],
                 [3, 240, 80, False, 'hardswish', 1],
                 [3, 200, 80, False, 'hardswish', 1],
-                [3, 184, 80, False, 'hardswish', 1],
-                [3, 184, 80, False, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
                 [3, 480, 112, True, 'hardswish', 1],
                 [3, 672, 112, True, 'hardswish', 1],
                 [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
@@ -136,9 +136,10 @@ class MobileNetV3(nn.Layer):
             i += 1
         self.blocks = nn.Sequential(*block_list)
         self.out_channels = inplanes*8 # make_divisible(scale * cls_ch_squeeze)# #80 # #160
+        # self.out_channels = inplanes
         self.conv2 = ConvBNLayer(
             in_channels=inplanes,
-            out_channels= inplanes*8, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
+            out_channels= self.out_channels, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
             kernel_size=1,
             stride=1,
             padding=0,
