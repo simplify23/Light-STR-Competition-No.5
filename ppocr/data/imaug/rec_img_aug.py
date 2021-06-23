@@ -23,13 +23,14 @@ from .text_image_aug import tia_perspective, tia_stretch, tia_distort
 from .cut_aug import RandomErasing, SingleErasing, LineErasing, CropErasing
 
 class RecAug(object):
-    def __init__(self, use_tia=True, aug_prob=0.4, **kwargs):
+    def __init__(self, use_tia=True, use_cutout=True, aug_prob=0.4, **kwargs):
         self.use_tia = use_tia
         self.aug_prob = aug_prob
+        self.use_cutout = use_cutout
 
     def __call__(self, data):
         #img = data['image']
-        img = warp(data, 10, self.use_tia, self.aug_prob)
+        img = warp(data, 10, self.use_tia, self.use_cutout, self.aug_prob)
         data['image'] = img
         return data
 
@@ -428,7 +429,7 @@ def get_warpAffine(config):
     return rz
 
 
-def warp(data, ang, use_tia=True, prob=0.4):
+def warp(data, ang, use_tia=True, use_cutout=True, prob=0.4):
     """
     warp
     """
@@ -472,7 +473,7 @@ def warp(data, ang, use_tia=True, prob=0.4):
     if config.reverse:
         if random.random() <= prob:
             new_img = 255 - new_img
-    if config.cut:
+    if config.cut and use_cutout:
         if random.random() <= prob:
             aug_list = ['RandomErasing', 'SingleErasing', 'LineErasing', 'CropErasing']
             idx = random.randint(0, len(aug_list) - 1)
