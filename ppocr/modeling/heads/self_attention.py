@@ -229,11 +229,15 @@ class EncoderLayer(nn.Layer):
 
         super(EncoderLayer, self).__init__()
         self.atten_method = atten_method
+        self.test = False
         self.preprocesser1 = PrePostProcessLayer(preprocess_cmd, d_model,
                                                  prepostprocess_dropout)
         if atten_method == 'MHA':
             self.self_attn = MultiHeadAttention(d_key, d_value, d_model, n_head,
                                             attention_dropout)
+        elif self.test == True:
+            self.self_attn = MultiHeadAttention_ztl(d_key, d_value, d_model, n_head,
+                                                attention_dropout)
         elif atten_method == 'Mixer':
             # 32 is w*h
             self.self_attn = MixerBlock(t_shape*4, t_shape, t_shape, relu_dropout)
@@ -301,17 +305,21 @@ class MultiHeadAttention(nn.Layer):
     Multi-Head Attention
     """
 
-    def __init__(self, d_key, d_value, d_model, n_head=1, dropout_rate=0.):
+    def __init__(self, d_key, d_value, d_model, n_head=1, dropout_rate=0.,test=False):
         super(MultiHeadAttention, self).__init__()
         self.n_head = n_head
-        self.d_key = d_key
+        if test == True:
+            self.d_key = 1
+        else:
+            self.d_key = d_key
+        self.d_query = d_key
         self.d_value = d_value
         self.d_model = d_model
         self.dropout_rate = dropout_rate
         self.q_fc = paddle.nn.Linear(
-            in_features=d_model, out_features=d_key * n_head, bias_attr=False)
+            in_features=d_model, out_features=self.d_query * n_head, bias_attr=False)
         self.k_fc = paddle.nn.Linear(
-            in_features=d_model, out_features=d_key * n_head, bias_attr=False)
+            in_features=d_model, out_features=self.d_key * n_head, bias_attr=False)
         self.v_fc = paddle.nn.Linear(
             in_features=d_model, out_features=d_value * n_head, bias_attr=False)
         self.proj_fc = paddle.nn.Linear(
@@ -325,7 +333,7 @@ class MultiHeadAttention(nn.Layer):
             static_kv = True
 
         q = self.q_fc(queries)
-        q = paddle.reshape(x=q, shape=[0, 0, self.n_head, self.d_key])
+        q = paddle.reshape(x=q, shape=[0, 0, self.n_head, self.d_query])
         q = paddle.transpose(x=q, perm=[0, 2, 1, 3])
 
         if cache is not None and static_kv and "static_k" in cache:
@@ -336,6 +344,8 @@ class MultiHeadAttention(nn.Layer):
             k = self.k_fc(keys)
             v = self.v_fc(values)
             k = paddle.reshape(x=k, shape=[0, 0, self.n_head, self.d_key])
+            if self.d_key == 1:
+                k = paddle.tile(k,[1,1,1,self.d_query])
             k = paddle.transpose(x=k, perm=[0, 2, 1, 3])
             v = paddle.reshape(x=v, shape=[0, 0, self.n_head, self.d_value])
             v = paddle.transpose(x=v, perm=[0, 2, 1, 3])
@@ -379,6 +389,95 @@ class MultiHeadAttention(nn.Layer):
 
         return out
 
+class MultiHeadAttention_ztl(nn.Layer):
+    """
+    Multi-Head Attention
+    """
+
+    def __init__(self, d_key, d_value, d_model, n_head=1, dropout_rate=0.,test=True):
+        super(MultiHeadAttention_ztl, self).__init__()
+        self.n_head = n_head
+        self.d_key = d_key
+        self.d_query = d_key
+        self.d_value = d_value
+        self.d_model = d_model
+        self.dropout_rate = dropout_rate
+        self.q_fc = paddle.nn.Linear(
+            in_features=d_model, out_features=self.d_query * n_head, bias_attr=False)
+        self.s_fc = paddle.nn.Linear(
+            in_features=d_model, out_features= n_head, bias_attr=False)
+        self.k_fc = paddle.nn.Linear(
+            in_features=d_model, out_features=self.d_key * n_head, bias_attr=False)
+        self.v_fc = paddle.nn.Linear(
+            in_features=d_model, out_features=d_value * n_head, bias_attr=False)
+        self.proj_fc = paddle.nn.Linear(
+            in_features=d_value * n_head, out_features=d_model, bias_attr=False)
+
+    def _prepare_qkv(self, queries, keys, values, cache=None):
+        if keys is None:  # self-attention
+            keys, values = queries, queries
+            static_kv = False
+        else:  # cross-attention
+            static_kv = True
+
+        q = self.q_fc(queries)
+        q = paddle.reshape(x=q, shape=[0, 0, self.n_head, self.d_query])
+        q = paddle.transpose(x=q, perm=[0, 2, 1, 3])
+
+        if cache is not None and static_kv and "static_k" in cache:
+            # for encoder-decoder attention in inference and has cached
+            k = cache["static_k"]
+            v = cache["static_v"]
+        else:
+            k = self.k_fc(keys)
+            v = self.v_fc(values)
+            s = self.s_fc(keys)
+            k = paddle.reshape(x=k, shape=[0, 0, self.n_head, self.d_key])
+            k = paddle.transpose(x=k, perm=[0, 2, 1, 3])
+            v = paddle.reshape(x=v, shape=[0, 0, self.n_head, self.d_value])
+            v = paddle.transpose(x=v, perm=[0, 2, 1, 3])
+
+            s = paddle.reshape(x=s, shape=[0, 0, self.n_head, 1])
+            s = paddle.tile(s,[1,1,1,self.d_query])
+            s = paddle.transpose(x=s, perm=[0, 2, 1, 3])
+
+        return q, k, v, s
+
+    def forward(self, queries, keys, values, attn_bias, cache=None):
+        # compute q ,k ,v
+        keys = queries if keys is None else keys
+        values = keys if values is None else values
+        q, k, v, s = self._prepare_qkv(queries, keys, values, cache)
+
+        s_product = paddle.matmul(x=q, y=s, transpose_y=True)
+        s_product = s_product * self.d_model**-0.5
+        if attn_bias is not None:
+            s_product += attn_bias
+        s_weights = F.softmax(s_product)
+        if self.dropout_rate:
+            s_weights = F.dropout(
+                s_weights, p=self.dropout_rate, mode="downscale_in_infer")
+
+        # scale dot product attention
+        product = paddle.matmul(x=q, y=k, transpose_y=True)
+        product = product * self.d_model**-0.5
+        if attn_bias is not None:
+            product += attn_bias
+        weights = F.softmax(product)
+
+        if self.dropout_rate:
+            weights = F.dropout(
+                weights, p=self.dropout_rate, mode="downscale_in_infer")
+        out = paddle.matmul(weights+s_weights, v)
+
+        # combine heads
+        out = paddle.transpose(out, perm=[0, 2, 1, 3])
+        out = paddle.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+
+        # project to output
+        out = self.proj_fc(out)
+
+        return out
 
 class PrePostProcessLayer(nn.Layer):
     """

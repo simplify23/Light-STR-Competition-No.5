@@ -58,7 +58,7 @@ class UMobileNetV3(nn.Layer):
                 [3, 480, 80,112, True, 'hardswish', 1],
                 [3, 672, 112,112, True, 'hardswish', 1],
                 [5, 672, 112,160, True, 'hardswish', (large_stride[3], 1)],
-                # [5, 960, 160,160, True, 'hardswish', 1],
+                [5, 960, 160,160, True, 'hardswish', 1],
                 [5, 960, 160,160, True, 'hardswish', 1],
             ]
             cfg_u_net = [

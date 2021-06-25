@@ -116,6 +116,35 @@ class Im2Seq_downsample(nn.Layer):
         out = conv_out
         return out,H*W
 
+class Im2Seq_unfold(nn.Layer):
+    def __init__(self, in_channels, out_channels=80, patch=2*160, **kwargs):
+        super().__init__()
+        self.out_channels = out_channels
+        self.kh = 2
+        self.kw = 3
+        self.patch = patch
+        self.ln =nn.LayerNorm([self.out_channels,80])
+        self.act1=nn.GELU()
+        self.down_fc = EncoderWithFC(in_channels*self.kw*self.kh,self.out_channels,'down_sample')
+        self.fc_block = nn.Sequential(
+            EncoderWithFC(self.out_channels,self.out_channels,'smooth'),
+            nn.LayerNorm([self.out_channels,80]),
+            nn.GELU()
+        )
+    def forward(self, x):
+
+        B, C, H, W = x.shape
+        x = nn.functional.unfold(x,[self.kh,self.kw],strides=[1,2],paddings=[0,1])
+        x = x.transpose([0, 2, 1])
+        x = self.down_fc(x)
+        x = self.act1(self.ln(x))
+
+        x = self.fc_block(x) + x
+
+        # (NTC)(batch, width, channels)
+        out = x
+        return out,H*W
+
 class Im2Seq_SqueezePatch(nn.Layer):
     def __init__(self, in_channels, out_channels=80, patch=2*160, **kwargs):
         super().__init__()
@@ -163,10 +192,10 @@ class Im2Seq_SqueezePatch(nn.Layer):
         a_out = self.seq_up(a_out)
         # a_out = F.relu(a_out)
         a_out = self.seq_down(a_out)
-        a_out = F.hardswish(a_out)
+        a_out = F.softmax(a_out)
         # print(a_out.shape)
 
-        conv_out = a_out+p_out
+        conv_out = a_out*p_out
         conv_out = self.avgpool(conv_out)
         # conv_out = self.conv_smooth(conv_out)
         # conv_out (B,C,H,W)
@@ -301,6 +330,8 @@ class SequenceEncoder(nn.Layer):
             self.encoder_reshape = Im2Seq_downsample(in_channels,hidden_size,self.patch)
         elif img2seq == 're-patch':
             self.encoder_reshape = Im2Seq_SqueezePatch(in_channels,hidden_size,self.patch)
+        elif img2seq == 'unfold':
+            self.encoder_reshape = Im2Seq_unfold(in_channels,hidden_size,self.patch)
         else:
             self.encoder_reshape = Im2Seq(in_channels)
         self.out_channels = self.encoder_reshape.out_channels

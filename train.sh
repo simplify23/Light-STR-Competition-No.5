@@ -8,18 +8,18 @@ python3 -m paddle.distributed.launch --gpus '3'  tools/train.py -c configs/rec/z
 python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '1,2,3,4,5,6,7'  tools/train.py -c configs/rec/ztl_config_exp/ztl_r50_tps_bilstm_ctc.yml
 
 #export model
-python3 tools/export_model.py -c output/rec/final_ztl_500_mv_trans_4_960/config.yml \
-                              -o Global.pretrained_model=output/rec/final_ztl_500_mv_trans_4_960/best_accuracy \
-                               Global.save_inference_dir=./inference/rec/final_ztl_500_mv_trans_4_960/best_accuracy
+python3 tools/export_model.py -c output/rec/final_ztl_500_mv_trans_4_960_last_100/config.yml \
+                              -o Global.pretrained_model=output/rec/final_ztl_500_mv_trans_4_960_last_100/best_accuracy \
+                               Global.save_inference_dir=./inference/rec/final_ztl_500_mv_trans_4_960_last_100/best_accuracy
 #infer for infer model
 python3 tools/infer/predict_rec.py --rec_algorithm=CRNN\
                                    --image_dir="train_data/ppdataset/test/testimages" \
                                    --rec_image_shape="3, 96, 960"\
                                    --use_srn_resize=True\
                                    --max_text_length=35\
-                                   --rec_model_dir=inference/rec/final_ztl_500_mv_trans_4_960/best_accuracy\
+                                   --rec_model_dir=inference/rec/final_ztl_500_mv_trans_4_960_last_100/best_accuracy\
                                    --rec_char_dict_path=ppocr/utils/ppocr_keys_v2.txt\
-                                   --rec_save_path="inference/rec/final_ztl_500_mv_trans_4_960/best_accuracy/latest_predict_rec.txt"
+                                   --rec_save_path="inference/rec/final_ztl_500_mv_trans_4_960_last_100/best_accuracy/latest_predict_rec.txt"
 #count error
 python3 tools/infer/predict_rec.py --rec_algorithm=STARNet\
                                    --image_dir="train_data/ppdataset/test/testimages" \

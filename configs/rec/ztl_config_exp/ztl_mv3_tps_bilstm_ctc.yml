@@ -1,9 +1,9 @@
 Global:
   use_gpu: true
-  epoch_num: 400
+  epoch_num: 450
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/final_ztl_500_mv_trans_4_960 # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/new_baseline_ztl_500_mv_trans_4_qkv_s # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
@@ -37,7 +37,7 @@ Optimizer:
   beta2: 0.999
   lr:
     name: Cosine
-    learning_rate: 0.0004
+    learning_rate: 0.001
   regularizer:
     name: 'L2'
     factor: 0.00001
@@ -57,7 +57,7 @@ Architecture:
 #    model_name: large
   Backbone:
     name: MobileNetV3
-    scale: 0.55
+    scale: 0.5
     model_name: large
 #  Backbone:
 #    name: ResNetFPN
@@ -71,7 +71,7 @@ Architecture:
     name: SequenceEncoder
     encoder_type: transformer #transformer+rnn transformer
     hidden_size: 80
-    patch: 120
+    patch: 80
     num_layers : 4
     img2seq: cnn+mixer #re-patch cnn+mixer
   Head:
@@ -108,12 +108,12 @@ Train:
 #      - RecResizeImg:
 #          image_shape: [3, 32, 320]
       - SRNRecResizeImgEx:
-          image_shape: [ 3, 96, 960 ]
+          image_shape: [ 3, 32, 320 ]
       - KeepKeys:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 26
+    batch_size_per_card: 220
     drop_last: True
     num_workers: 8
 
@@ -134,11 +134,11 @@ Eval:
 #      - RecResizeImg:
 #          image_shape: [3, 32, 320]
       - SRNRecResizeImgEx:
-          image_shape: [3, 96, 960]
+          image_shape: [3, 32, 320]
       - KeepKeys:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 26
+    batch_size_per_card: 220
     num_workers: 8
