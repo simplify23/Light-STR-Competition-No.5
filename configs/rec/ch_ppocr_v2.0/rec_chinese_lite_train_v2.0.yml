@@ -1,4 +1,4 @@
-Global:
+aiGlobal:
   use_gpu: true
   epoch_num: 500
   log_smooth_window: 20
