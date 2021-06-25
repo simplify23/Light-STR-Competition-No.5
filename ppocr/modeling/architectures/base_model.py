@@ -66,6 +66,7 @@ class BaseModel(nn.Layer):
 
         # # build head, head is need for det, rec and cls
         config["Head"]['in_channels'] = in_channels
+        # print(config["Head"])
         self.head = build_head(config["Head"])
 
     def forward(self, x, data=None):

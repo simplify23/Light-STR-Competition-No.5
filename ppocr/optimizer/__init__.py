@@ -44,6 +44,8 @@ def build_optimizer(config, epochs, step_each_epoch, parameters):
         reg_config = config.pop('regularizer')
         reg_name = reg_config.pop('name') + 'Decay'
         reg = getattr(regularizer, reg_name)(**reg_config)()
+    elif config['name'] == 'AdamW':
+        reg = config['weight_decay_adamw']
     else:
         reg = None
 

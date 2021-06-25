@@ -53,11 +53,31 @@ class MobileNetV3(nn.Layer):
                 [5, 120, 40, True, 'relu', 1],
                 [3, 240, 80, False, 'hardswish', 1],
                 [3, 200, 80, False, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
+                [3, 480, 112, True, 'hardswish', 1],
+                [3, 672, 112, True, 'hardswish', 1],
+                [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
+                [5, 960, 160, True, 'hardswish', 1],
+                [5, 960, 160, True, 'hardswish', 1],
+            ]
+            cls_ch_squeeze = 960
+        elif model_name == "large-64":
+            cfg = [
+                # k, exp, c,  se,     nl,  s,
+                [3, 16, 16, False, 'relu', large_stride[0]],
+                [3, 64, 24, False, 'relu', (large_stride[1], 1)],
+                [3, 72, 24, False, 'relu', 1],
+                [5, 72, 40, True, 'relu', (large_stride[2], 1)],
+                [5, 120, 40, True, 'relu', 1],
+                [5, 120, 40, True, 'relu', 1],
+                [3, 240, 80, False, 'hardswish', (large_stride[3], 1)],
+                [3, 200, 80, False, 'hardswish', 1],
                 [3, 184, 80, False, 'hardswish', 1],
                 [3, 184, 80, False, 'hardswish', 1],
                 [3, 480, 112, True, 'hardswish', 1],
                 [3, 672, 112, True, 'hardswish', 1],
-                [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
+                [5, 672, 160, True, 'hardswish', (large_stride[3], 2)],
                 [5, 960, 160, True, 'hardswish', 1],
                 [5, 960, 160, True, 'hardswish', 1],
             ]
@@ -83,8 +103,8 @@ class MobileNetV3(nn.Layer):
                                       "_model] is not implemented!")
 
         supported_scale = [0.35, 0.5, 0.75, 1.0, 1.25]
-        assert scale in supported_scale, \
-            "supported scales are {} but input scale is {}".format(supported_scale, scale)
+        # assert scale in supported_scale, \
+        #     "supported scales are {} but input scale is {}".format(supported_scale, scale)
 
         inplanes = 16
         # conv1
@@ -115,10 +135,11 @@ class MobileNetV3(nn.Layer):
             inplanes = make_divisible(scale * c)
             i += 1
         self.blocks = nn.Sequential(*block_list)
-        self.out_channels = inplanes*8 #80 #make_divisible(scale * cls_ch_squeeze) #160
+        self.out_channels = inplanes*8 # make_divisible(scale * cls_ch_squeeze)# #80 # #160
+        # self.out_channels = inplanes
         self.conv2 = ConvBNLayer(
             in_channels=inplanes,
-            out_channels= inplanes*8, #make_divisible(scale * cls_ch_squeeze), #160
+            out_channels= self.out_channels, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
             kernel_size=1,
             stride=1,
             padding=0,
@@ -139,6 +160,7 @@ class MobileNetV3(nn.Layer):
         # self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x):
+        # print(x.shape)
         x = self.conv1(x)
         x = self.blocks(x)
         x = self.conv2(x)
