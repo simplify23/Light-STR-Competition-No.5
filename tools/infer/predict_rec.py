@@ -90,6 +90,7 @@ class TextRecognizer(object):
         self.max_text_length = args.max_text_length
         self.save_path = args.rec_save_path
         self.use_srn_resize = args.use_srn_resize
+        self.srn_resize_shape = [int(v) for v in args.srn_resize_shape.split(",")]
         postprocess_params = {
             'name': 'CTCLabelDecode',
             "character_type": args.rec_char_type,
@@ -136,7 +137,7 @@ class TextRecognizer(object):
 
     def resize_norm_img_ex(self, img, image_shape):
         imgC, imgH, imgW = image_shape
-
+        #print("resize_norm_img_ex : ", image_shape)
         im_hei = img.shape[0]
         im_wid = img.shape[1]
         new_wid = imgW
@@ -251,7 +252,7 @@ class TextRecognizer(object):
             for ino in range(beg_img_no, end_img_no):
                 if self.rec_algorithm != "SRN":
                     if self.use_srn_resize:
-                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], [3, 96, 960])
+                        norm_img = self.resize_norm_img_ex(img_list[indices[ino]], self.srn_resize_shape)
                     else:
                         norm_img = self.resize_norm_img(img_list[indices[ino]],
                                                         max_wh_ratio)
