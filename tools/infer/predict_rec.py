@@ -90,7 +90,7 @@ class TextRecognizer(object):
         self.max_text_length = args.max_text_length
         self.save_path = args.rec_save_path
         self.use_srn_resize = args.use_srn_resize
-        self.srn_resize_shape = [int(v) for v in args.srn_resize_shape.split(",")]
+        self.srn_resize_shape = [int(v) for v in args.rec_image_shape.split(",")]
         postprocess_params = {
             'name': 'CTCLabelDecode',
             "character_type": args.rec_char_type,

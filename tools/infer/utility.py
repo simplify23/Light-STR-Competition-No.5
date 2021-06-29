@@ -107,7 +107,7 @@ def parse_args():
     parser.add_argument("--process_id", type=int, default=0)
 
     parser.add_argument("--use_srn_resize", type=str2bool, default=False)
-    parser.add_argument("--srn_resize_shape", type=str, default="3, 32, 320")
+    parser.add_argument("--srn_resize_shape", type=str, default="3, 64, 640")
     #统计置信度低于0.99的测试集
     parser.add_argument("--acc_save_path", type=str)
 

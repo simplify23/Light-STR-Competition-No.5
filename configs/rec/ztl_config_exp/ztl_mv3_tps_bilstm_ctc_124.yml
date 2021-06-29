@@ -1,9 +1,9 @@
 Global:
   use_gpu: true
-  epoch_num: 500
+  epoch_num: 400
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/ztl_500_umv_se_trans_4_640 # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/final_500_umv_trans_2_9.8M # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
@@ -48,7 +48,7 @@ Architecture:
   Backbone:
     name: UMobileNetV3
     scale: 0.5
-    model_name: large
+    model_name: large-v2
   #  Backbone:
   #    name: ResNet
   #    layers: 18
@@ -62,7 +62,7 @@ Architecture:
     encoder_type: transformer
     hidden_size: 80
     patch: 80
-    num_layers : 4
+    num_layers : 2
     img2seq: cnn+mixer
   Head:
     name: CTCHead
@@ -89,6 +89,7 @@ Train:
           channel_first: False
       - RecAug:
           use_tia: True
+          use_cutout: True
           aug_prob: 0.4
       - CTCLabelEncode: # Class handling label
       #      - SRNRecResizeImg:

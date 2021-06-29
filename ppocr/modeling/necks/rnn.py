@@ -236,6 +236,7 @@ class TransformerPosEncoder(nn.Layer):
             preprocess_cmd="n",
             postprocess_cmd="da",
             weight_sharing=True,
+            use_pos_module=False,
             dim_seq = self.width)
 
     def forward(self, conv_features):
@@ -250,7 +251,7 @@ class TransformerPosEncoder(nn.Layer):
 class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithTrans, self).__init__()
-        self.out_channels = hidden_size *2 # 3 #2
+        self.out_channels = hidden_size *2# 3 #2
         self.custom_channel = hidden_size
         self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
         # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
