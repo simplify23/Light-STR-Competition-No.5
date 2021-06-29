@@ -86,21 +86,21 @@ class UMobileNetV3(nn.Layer):
                 [3, 64, 16,24, False, 'relu', (large_stride[1], 1)], #8*80 //16*160 i=1
                 [3, 72, 24,24, False, 'relu', 1],
                 [5, 72, 24,40, True, 'relu', (large_stride[2], 1)], #
-                [5, 120, 96,40, True, 'relu', 1],
+                [5, 120, 40,40, True, 'relu', 1],
                 [5, 120, 40,40, True, 'relu', 1],
                 [3, 240, 40,80, False, 'hardswish', 1],
-                [3, 200, 80*2,80, True, 'hardswish', 1],
+                [3, 200, 80,80, False, 'hardswish', 1],
                 [3, 184, 80,80, True, 'hardswish', 1],
                 [3, 184, 80,80, True, 'hardswish', 1],
                 [3, 480, 80,112, True, 'hardswish', 1],
                 [3, 672, 112,112, True, 'hardswish', 1],
                 [5, 672, 112,160, True, 'hardswish', (large_stride[3], 1)],
                 [5, 960, 160,160, True, 'hardswish', 1],
-                [5, 960, 160,160, True, 'hardswish', 1],
+                [5, 960, 160,160, False, 'hardswish', 1],
             ]
             cfg_u_net = [
                 # k,exp,i_c,o_c,se,  act,   s
-                [3, 120, 24, 40, False, 'relu', 1],                   #i = 0
+                [3, 120, 24, 40, True, 'relu', 1],                   #i = 0
                 [3, 200, 40, 80, True, 'relu', (large_stride[1], 1)],
                 # [3, 240, 80, 80, True, 'hardswish', 1],
                 [3, 480, 80, 112, True, 'hardswish', 1],         #i=2
@@ -113,7 +113,7 @@ class UMobileNetV3(nn.Layer):
                 # [3, 480, 112, 112, True, 'hardswish', 1],  #i = 8
                 [3, 200, 80*2,80, True, 'hardswish', 1],         #i=5 up1
                 [3, 120, 80,  40, True, 'relu', 1],
-                [3, 120, 56,24, True, 'relu', 1],        #i=7 up2
+                [3, 120, 56,24, True, 'relu', 1],        #i=7 up2(400,600)
             ]
             cls_ch_squeeze = 960
         else:

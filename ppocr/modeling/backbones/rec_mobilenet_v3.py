@@ -62,7 +62,7 @@ class MobileNetV3(nn.Layer):
                 [5, 960, 160, True, 'hardswish', 1],
             ]
             cls_ch_squeeze = 960
-        elif model_name == "large-64":
+        elif model_name == "large-fix":
             cfg = [
                 # k, exp, c,  se,     nl,  s,
                 [3, 16, 16, False, 'relu', large_stride[0]],
@@ -71,13 +71,13 @@ class MobileNetV3(nn.Layer):
                 [5, 72, 40, True, 'relu', (large_stride[2], 1)],
                 [5, 120, 40, True, 'relu', 1],
                 [5, 120, 40, True, 'relu', 1],
-                [3, 240, 80, False, 'hardswish', (large_stride[3], 1)],
+                [3, 240, 80, False, 'hardswish', 1],
                 [3, 200, 80, False, 'hardswish', 1],
-                [3, 184, 80, False, 'hardswish', 1],
-                [3, 184, 80, False, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
+                [3, 184, 80, True, 'hardswish', 1],
                 [3, 480, 112, True, 'hardswish', 1],
                 [3, 672, 112, True, 'hardswish', 1],
-                [5, 672, 160, True, 'hardswish', (large_stride[3], 2)],
+                [5, 672, 160, True, 'hardswish', (large_stride[3], 1)],
                 [5, 960, 160, True, 'hardswish', 1],
                 [5, 960, 160, True, 'hardswish', 1],
             ]

@@ -3,7 +3,7 @@ Global:
   epoch_num: 450
   log_smooth_window: 20
   print_batch_step: 30
-  save_model_dir: ./output/rec/new_baseline_ztl_500_mv_trans_4_qkv_s # >ztl_500_mv_l_d_trans_2_80_160
+  save_model_dir: ./output/rec/exp1_ztl_450_mv_trans_4_pos_all # >ztl_500_mv_l_d_trans_2_80_160
   save_epoch_step: 50
   # evaluation is run every 5000 iterations after the 4000th iteration
   eval_batch_step: [0, 2000]
@@ -20,7 +20,7 @@ Global:
   infer_mode: False
   use_space_char: False
   save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
-  count_model: False
+  count_model: True
   mix_up: 0.4
 
 #Optimizer:
@@ -56,9 +56,9 @@ Architecture:
 #    scale: 0.55
 #    model_name: large
   Backbone:
-    name: MobileNetV3
+    name: UMobileNetV3
     scale: 0.5
-    model_name: large
+    model_name: large-v2
 #  Backbone:
 #    name: ResNetFPN
 #    layers: 50
@@ -72,7 +72,7 @@ Architecture:
     encoder_type: transformer #transformer+rnn transformer
     hidden_size: 80
     patch: 80
-    num_layers : 4
+    num_layers : 2
     img2seq: cnn+mixer #re-patch cnn+mixer
   Head:
     name: CTCHead
@@ -99,6 +99,7 @@ Train:
           channel_first: False
       - RecAug:
           use_tia: True
+          use_cutout: True
           aug_prob: 0.4
       - CTCLabelEncode: # Class handling label
 #      - SRNRecResizeImg:
@@ -113,7 +114,7 @@ Train:
           keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
   loader:
     shuffle: True
-    batch_size_per_card: 220
+    batch_size_per_card: 200
     drop_last: True
     num_workers: 8
 
@@ -140,5 +141,5 @@ Eval:
   loader:
     shuffle: False
     drop_last: False
-    batch_size_per_card: 220
+    batch_size_per_card: 200
     num_workers: 8

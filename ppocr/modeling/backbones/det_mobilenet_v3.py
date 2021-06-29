@@ -177,7 +177,7 @@ class ConvBNLayer(nn.Layer):
             groups=groups,
             weight_attr=ParamAttr(name=name + '_weights'),
             bias_attr=False)
-
+        # self.bn = nn.BatchNorm(out_channels)
         self.bn = nn.BatchNorm(
             num_channels=out_channels,
             act=None,
