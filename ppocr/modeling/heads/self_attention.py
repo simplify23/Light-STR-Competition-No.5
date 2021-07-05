@@ -68,7 +68,7 @@ class WrapEncoderForFeature(nn.Layer):
         self.encoder = Encoder(n_layer, n_head, d_key, d_value, d_model,
                                d_inner_hid, prepostprocess_dropout,
                                attention_dropout, relu_dropout, t_shape, preprocess_cmd,
-                               postprocess_cmd)
+                               postprocess_cmd,use_pos_module)
 
     def forward(self, enc_inputs):
         conv_features, src_pos, src_slf_attn_bias = enc_inputs
@@ -139,10 +139,12 @@ class Encoder(nn.Layer):
                  relu_dropout,
                  t_shape,
                  preprocess_cmd="n",
-                 postprocess_cmd="da"):
+                 postprocess_cmd="da",
+                 use_pos_module=False):
 
         super(Encoder, self).__init__()
         atten_method ='MHA'
+        self.use_pos_module = use_pos_module
         self.encoder_layers = list()
         test_flag = False
         if test_flag == True:
@@ -167,9 +169,12 @@ class Encoder(nn.Layer):
 
     def forward(self, enc_input, attn_bias,pos_enc=None):
         for encoder_layer in self.encoder_layers:
-            if pos_enc != None:
-                enc_input =enc_input + pos_enc
-            enc_output = encoder_layer(enc_input, attn_bias)
+            # enc_output = encoder_layer(enc_input+pos_enc, attn_bias)
+            if self.use_pos_module==True:
+                enc_input+=pos_enc
+                enc_output = encoder_layer(enc_input, attn_bias)
+            else:
+                enc_output = encoder_layer(enc_input, attn_bias)
             enc_input = enc_output
         enc_output = self.processer(enc_output)
         return enc_output
