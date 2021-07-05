@@ -28,6 +28,7 @@ class UMobileNetV3(nn.Layer):
                  small_stride=None,
                  **kwargs):
         super(UMobileNetV3, self).__init__()
+        self.model_name = model_name
         if small_stride is None:
             small_stride = [2, 2, 2, 2]
         if large_stride is None:
@@ -116,6 +117,43 @@ class UMobileNetV3(nn.Layer):
                 [3, 120, 56,24, True, 'relu', 1],        #i=7 up2(400,600)
             ]
             cls_ch_squeeze = 960
+        elif model_name == "umv+mv":
+            cfg = [
+                # k, exp, c,  se,     nl,  s,
+                [3, 16, 16,16, False, 'relu', large_stride[0]],   #8*80 //16*160
+                [3, 64, 16,24, False, 'relu', (large_stride[1], 1)], #8*80 //16*160 i=1
+                [3, 72, 24,24, False, 'relu', 1],
+                [5, 72, 24,40, True, 'relu', (large_stride[2], 1)], #
+                [5, 120, 40,40, True, 'relu', 1],
+                [5, 120, 40,40, True, 'relu', 1],
+                [3, 240, 40,80, False, 'hardswish', 1],
+                [3, 200, 80,80, False, 'hardswish', 1],
+                [3, 184, 80,80, True, 'hardswish', 1],
+                [3, 184, 80,80, True, 'hardswish', 1],
+                [3, 480, 80,112, True, 'hardswish', 1],
+                [3, 672, 112,112, True, 'hardswish', 1],
+                [5, 672, 112,160, True, 'hardswish', (large_stride[3], 1)],
+                [5, 960, 160,160, True, 'hardswish', 1],
+                [5, 960, 160,160, True, 'hardswish', 1],
+            ]
+            cfg_u_net = [
+                # k,exp,i_c,o_c,se,  act,   s
+                [3, 120, 24, 40, True, 'relu', 1],                   #i = 0
+                [3, 200, 40, 80, True, 'relu', (large_stride[1], 1)],
+                # [3, 240, 80, 80, True, 'hardswish', 1],
+                [3, 480, 80, 112, True, 'hardswish', 1],         #i=2
+                # [3, 672, 112, 112, True, 'hardswish', 1],
+                [3, 672, 112, 160, True, 'hardswish', (large_stride[3], 1)], # i = 3
+                # [3, 960, 160,160, True, 'hardswish', 1],
+                # up block
+                # [3, 672, 240*2,160, True, 'hardswish', 1], # i = 7 concat=240+240
+                [3, 480, 160, 112, True, 'hardswish', 1],
+                # [3, 480, 112, 112, True, 'hardswish', 1],  #i = 8
+                [3, 200, 80*2,80, True, 'hardswish', 1],         #i=5 up1
+                [3, 120, 80,  40, True, 'relu', 1],
+                [3, 120, 56,24, True, 'relu', 1],        #i=7 up2(400,600)
+            ]
+            cls_ch_squeeze = 960
         else:
             raise NotImplementedError("mode[" + model_name +
                                       "_model] is not implemented!")
@@ -137,6 +175,7 @@ class UMobileNetV3(nn.Layer):
             act='hardswish',
             name='conv1')
         i = 0
+        mv_block_list = []
         block_list = []
         ublock_list = []
         inplanes = make_divisible(inplanes * scale)
@@ -166,6 +205,22 @@ class UMobileNetV3(nn.Layer):
                     act=nl,
                     name='u-conv' + str(i + 2)))
             i += 1
+        i = 0
+        if model_name == "umv+mv":
+            for (k, exp, in_c,out_c, se, nl, s) in cfg:
+                mv_block_list.append(
+                    ResidualUnit(
+                        in_channels=make_divisible(scale * in_c),
+                        mid_channels=make_divisible(scale * exp),
+                        out_channels=make_divisible(scale * out_c),
+                        kernel_size=k,
+                        stride=s,
+                        use_se=se,
+                        act=nl,
+                        name='mv_conv' + str(i + 2)))
+                inplanes = make_divisible(scale * out_c)
+                i += 1
+            self.mv_blocks = nn.Sequential(*mv_block_list)
         self.blocks = nn.Sequential(*block_list)
         self.ublocks = nn.Sequential(*ublock_list)
         self.up1 = nn.Conv2DTranspose(in_channels=make_divisible(scale * 112),
@@ -181,6 +236,16 @@ class UMobileNetV3(nn.Layer):
 
         # self.out_channels = inplanes*8 # origin umobilenet
         self.out_channels = inplanes*6
+        self.conv2_2 = ConvBNLayer(
+            in_channels=inplanes,
+            out_channels= self.out_channels, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            groups=1,
+            if_act=True,
+            act='hardswish',
+            name='conv_last_2')
         self.conv2 = ConvBNLayer(
             in_channels=inplanes*2,
             out_channels= self.out_channels, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
@@ -207,8 +272,13 @@ class UMobileNetV3(nn.Layer):
         # print(x.shape)
         x = self.conv1(x)
         use_m_concat = False
+        mv_out = None
         u1_concat,u2_concat,u3_concat = None,None,None
         m1_concat,m2_concat,m3_concat = None,None,None
+        if self.model_name == 'umv+mv':
+            mv_out = self.mv_blocks(x)
+            mv_out = self.conv2_2(mv_out)
+
         for i,n in enumerate(self.blocks):
             # mobilenet pipline
             x = n(x)
@@ -243,4 +313,8 @@ class UMobileNetV3(nn.Layer):
         # x = self.pool(x)
         # x = self.conv_smooth(x)
         # print(x.shape)
-        return x
+        if self.model_name=='umv+mv':
+            out = [x,mv_out]
+        else:
+            out = x
+        return out

@@ -37,6 +37,20 @@ class FusionAttention(nn.Layer):
         unit = F.hardsigmoid(self.fc_up(unit))
         return x*unit
 
+class AddAttention(nn.Layer):
+    def __init__(self,in_channel,):
+        super(AddAttention, self).__init__()
+        self.fc_x = EncoderWithFC(in_channel*2,in_channel,"fusion_x1")
+        # self.fc_x2 = EncoderWithFC(in_channel,in_channel,"fusion_x2")
+        self.smooth = EncoderWithFC(in_channel,in_channel,"fusion_smooth")
+
+    def forward(self, x1,x2, **kwargs):
+        f = paddle.concat([x1, x2], axis=2)
+        f_att = F.sigmoid(self.fc_x(f))
+        output = f_att * x1 + (1-f_att) * x2
+        output = self.smooth(output)
+        return output
+
 class Im2Seq(nn.Layer):
     def __init__(self, in_channels, **kwargs):
         super().__init__()
@@ -50,7 +64,7 @@ class Im2Seq(nn.Layer):
         return x,H*W
 
 class Im2Seq_downsample(nn.Layer):
-    def __init__(self, in_channels, out_channels=80, patch=2*160, **kwargs):
+    def __init__(self, in_channels, out_channels=80, patch=2*160, conv_name='conv_patch',**kwargs):
         super().__init__()
         self.out_channels = out_channels
         self.patch = patch
@@ -67,7 +81,7 @@ class Im2Seq_downsample(nn.Layer):
             groups=1,
             if_act=True,
             act='hardswish',
-            name='conv_patch')
+            name=conv_name)
         if self.use_resnet == True:
             self.conv2 = nn.Conv2D(
                 in_channels=in_channels,
@@ -116,33 +130,42 @@ class Im2Seq_downsample(nn.Layer):
         out = conv_out
         return out,H*W
 
-class Im2Seq_unfold(nn.Layer):
+class Im2Seq_Double(nn.Layer):
     def __init__(self, in_channels, out_channels=80, patch=2*160, **kwargs):
         super().__init__()
         self.out_channels = out_channels
-        self.kh = 2
-        self.kw = 3
         self.patch = patch
-        self.ln =nn.LayerNorm([self.out_channels,80])
-        self.act1=nn.GELU()
-        self.down_fc = EncoderWithFC(in_channels*self.kw*self.kh,self.out_channels,'down_sample')
-        self.fc_block = nn.Sequential(
-            EncoderWithFC(self.out_channels,self.out_channels,'smooth'),
-            nn.LayerNorm([self.out_channels,80]),
-            nn.GELU()
-        )
-    def forward(self, x):
-
-        B, C, H, W = x.shape
-        x = nn.functional.unfold(x,[self.kh,self.kw],strides=[1,2],paddings=[0,1])
-        x = x.transpose([0, 2, 1])
-        x = self.down_fc(x)
-        x = self.act1(self.ln(x))
-
-        x = self.fc_block(x) + x
+        self.conv1 = ConvBNLayer(
+            in_channels=in_channels,
+            out_channels= self.out_channels, #make_divisible(scale * cls_ch_squeeze), #160
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            groups=1,
+            if_act=True,
+            act='hardswish',
+            name='conv_patch')
+        self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+        # self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+    def forward(self, enc_out):
+        # print(x.shape)
+        out = []
+        for x in enc_out:
+            x = self.pool(x)
+            B, C, H, W = x.shape
+            if H != 1 :
+                pool2 = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+                x = pool2(x)
+            x = self.conv1(x)
+            # print(x.shape)
+            assert H == 1
+            conv_out = paddle.reshape(x=x, shape=[-1, self.out_channels, self.patch])
+            # conv_out = conv_out.squeeze(axis=2)
+            conv_out = conv_out.transpose([0, 2, 1])
+            out.append(conv_out)
 
         # (NTC)(batch, width, channels)
-        out = x
+        # print(conv_out.shape)
         return out,H*W
 
 class Im2Seq_SqueezePatch(nn.Layer):
@@ -248,10 +271,33 @@ class TransformerPosEncoder(nn.Layer):
         out = self.wrap_encoder_for_feature(enc_inputs)
         return out
 
+class EncoderWithTrans_Double(nn.Layer):
+    def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
+        super(EncoderWithTrans_Double, self).__init__()
+        self.out_channels = hidden_size *2# 3 #2
+        self.custom_channel = hidden_size
+        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
+        self.transformer2=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
+        self.up_linear = EncoderWithFC(self.custom_channel,self.out_channels,'up_encoder')
+        self.up_linear2 = EncoderWithFC(self.custom_channel,self.out_channels,'up_encoder2')
+        self.attention = AddAttention(self.out_channels)
+
+    def forward(self, x1, x2):
+        # x = self.down_linear(x)
+        x1 = self.transformer(x1)
+        x1 = self.up_linear(x1)
+
+        x2 = self.transformer(x2)
+        x2 = self.up_linear(x2)
+        # x, _ = self.lstm(x)
+        x = self.attention(x1,x2)
+        # print(x.shape)
+        return x
+
 class EncoderWithTrans(nn.Layer):
     def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
         super(EncoderWithTrans, self).__init__()
-        self.out_channels = hidden_size *2# 3 #2
+        self.out_channels = hidden_size *2 #2
         self.custom_channel = hidden_size
         self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
         # self.down_linear = EncoderWithFC(in_channels,self.custom_channel,'down_encoder')
@@ -327,12 +373,14 @@ class SequenceEncoder(nn.Layer):
     def __init__(self, in_channels, encoder_type, hidden_size=48, num_layers=2,patch = 120, img2seq='origin',**kwargs):
         super(SequenceEncoder, self).__init__()
         self.patch = patch
+        self.img2seq =img2seq
         if img2seq == 'cnn+mixer':
             self.encoder_reshape = Im2Seq_downsample(in_channels,hidden_size,self.patch)
         elif img2seq == 're-patch':
             self.encoder_reshape = Im2Seq_SqueezePatch(in_channels,hidden_size,self.patch)
-        elif img2seq == 'unfold':
-            self.encoder_reshape = Im2Seq_unfold(in_channels,hidden_size,self.patch)
+        elif img2seq == 'double':
+            self.encoder_reshape = Im2Seq_downsample(in_channels,hidden_size,self.patch,'x1_conv_name')
+            self.encoder_reshape2 = Im2Seq_downsample(in_channels,hidden_size,self.patch,'x2_conv_name')
         else:
             self.encoder_reshape = Im2Seq(in_channels)
         self.out_channels = self.encoder_reshape.out_channels
@@ -356,6 +404,7 @@ class SequenceEncoder(nn.Layer):
                 'fc': EncoderWithFC,
                 'rnn': EncoderWithRNN,
                 'transformer': EncoderWithTrans,
+                'transformer_double': EncoderWithTrans_Double,
                 'transformer+rnn': EncoderWithTransRNN,
             }
             assert encoder_type in support_encoder_dict, '{} must in {}'.format(
@@ -367,8 +416,13 @@ class SequenceEncoder(nn.Layer):
             self.only_reshape = False
 
     def forward(self, x):
-        if self.encoder_type!= 'cnn':
+        if self.encoder_type!= 'cnn' and self.img2seq!='double':
             x, _ = self.encoder_reshape(x)
-        if not self.only_reshape:
+        elif self.img2seq =='double':
+            x[0], _ = self.encoder_reshape(x[0])
+            x[1], _ = self.encoder_reshape2(x[1])
+        if not self.only_reshape and self.img2seq!='double':
             x = self.encoder(x)
+        elif self.img2seq =='double':
+            x = self.encoder(x[0],x[1])
         return x
