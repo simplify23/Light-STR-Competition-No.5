@@ -1,3 +1,4 @@
+
 ## 简介
 这里是[Paddle轻量级文字识别技术创新大赛](https://aistudio.baidu.com/aistudio/competition/detail/75)第11名的代码链接。
 - 我们的模型**总大小9.8M A榜精度80.78% B榜精度79%**
@@ -82,6 +83,21 @@ class EncoderWithTrans(nn.Layer):
 - [模型的其他策略介绍](https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/doc/doc_ch/tree.md)
 
 ## 环境部署
+- **我们的环境部署和PPOCR完全一致**，环境尽可能按官方环境来（值得注意的是python3.8环境似乎不支持U-mobilenet的代码内容）
+- python =3.7
+- PaddlePaddle-gpu = 2.0.2
+#### docker环境
+docker运行细节请见文档[Docker化部署](https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/deploy/docker/hubserving/README_cn.md)。
+```
+#切换至Dockerfile目录
+cd deploy/docker/hubserving/gpu
+
+#生成镜像
+docker build -t paddleocr:gpu .
+
+#运行镜像
+sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
+```
 ## 如何运行
 
 
