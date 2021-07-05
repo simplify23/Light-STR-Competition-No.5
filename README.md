@@ -100,5 +100,7 @@ sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
 ```
 ## 如何运行
 
+## License
+This project is released under <a href="https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/LICENSE">Apache 2.0 license</a>
 
 
