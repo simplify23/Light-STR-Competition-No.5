@@ -80,14 +80,14 @@ class EncoderWithTrans(nn.Layer):
 > - 使用了Cut out 数据增强策略
 
 由于篇幅原因，我们将数据增强部分，参数优化设置，以及整体代码目录均放在下面文档中：
-- [模型的其他策略介绍](https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/doc/doc_ch/tree.md)
+- [模型的其他策略介绍](./doc/doc_ch/tree.md)
 
 ## 环境部署
 - **我们的环境部署和PPOCR完全一致**，环境尽可能按官方环境来（值得注意的是python3.8环境似乎不支持U-mobilenet的代码内容）
 - python =3.7
 - PaddlePaddle-gpu = 2.0.2
 #### docker环境
-docker运行细节请见文档[Docker化部署](https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/deploy/docker/hubserving/README_cn.md)。
+docker运行细节请见文档[Docker化部署](./deploy/docker/hubserving/README_cn.md)。
 ```
 #切换至Dockerfile目录
 cd deploy/docker/hubserving/gpu
