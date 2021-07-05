@@ -1,164 +1,83 @@
-[English](README.md) | 简体中文
-
 ## 简介
-PaddleOCR旨在打造一套丰富、领先、且实用的OCR工具库，助力使用者训练出更好的模型，并应用落地。
+这里是[Paddle轻量级文字识别技术创新大赛](https://aistudio.baidu.com/aistudio/competition/detail/75)第11名的代码链接。
+- 我们的模型**总大小9.8M A榜精度80.78% B榜精度79%**
+- 模型整体pipline：U-mobilenet + downsample + transformer*2
+- 最终的提交代码训练细节为： 400轮训练lr0.001 + 150轮训练lr0.00001（去掉mix_up和cutout）
+- 我们算法的最大特点：**仅仅从模型设计的角度思考了这一问题**，
+暂时没有使用模型压缩的策略（如剪枝，蒸馏，量化等，未来会考虑）
 
-## 文档教程
-- [快速安装](./doc/doc_ch/installation.md)
-- [中文OCR模型快速使用](./doc/doc_ch/quickstart.md)
-- [多语言OCR模型快速使用](./doc/doc_ch/multi_languages.md)
-- [代码组织结构](./doc/doc_ch/tree.md)
-- 算法介绍
-  - [文本检测](./doc/doc_ch/algorithm_overview.md)
-  - [文本识别](./doc/doc_ch/algorithm_overview.md)
-  - [PP-OCR Pipeline](#PP-OCR)
-  - [端到端PGNet算法](./doc/doc_ch/pgnet.md)
-- 模型训练/评估
-  - [文本检测](./doc/doc_ch/detection.md)
-  - [文本识别](./doc/doc_ch/recognition.md)
-  - [方向分类器](./doc/doc_ch/angle_class.md)
-  - [yml参数配置文件介绍](./doc/doc_ch/config.md)
-- 预测部署
-  - [基于pip安装whl包快速推理](./doc/doc_ch/whl.md)
-  - [基于Python脚本预测引擎推理](./doc/doc_ch/inference.md)
-  - [基于C++预测引擎推理](./deploy/cpp_infer/readme.md)
-  - [服务化部署](./deploy/hubserving/readme.md)
-  - [端侧部署](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/deploy/lite/readme.md)
-  - [Benchmark](./doc/doc_ch/benchmark.md)
-- 数据集
-  - [通用中英文OCR数据集](./doc/doc_ch/datasets.md)
-  - [手写中文OCR数据集](./doc/doc_ch/handwritten_datasets.md)
-  - [垂类多语言OCR数据集](./doc/doc_ch/vertical_and_multilingual_datasets.md)
-- 数据标注与合成
-  - [半自动标注工具PPOCRLabel](./PPOCRLabel/README_ch.md)
-  - [数据合成工具Style-Text](./StyleText/README_ch.md)
-  - [其它数据标注工具](./doc/doc_ch/data_annotation.md)
-  - [其它数据合成工具](./doc/doc_ch/data_synthesis.md)
-- [效果展示](#效果展示)
-- FAQ
-  - [【精选】OCR精选10个问题](./doc/doc_ch/FAQ.md)
-  - [【理论篇】OCR通用41个问题](./doc/doc_ch/FAQ.md)
-  - [【实战篇】PaddleOCR实战147个问题](./doc/doc_ch/FAQ.md)
-- [技术交流群](#欢迎加入PaddleOCR技术交流群)
-- [参考文献](./doc/doc_ch/reference.md)
-- [许可证书](#许可证书)
-- [贡献代码](#贡献代码)
+## 算法介绍
+所有的参数设计的实验均记录在[paddle文字识别参数对比实验](https://mbqx5nqmwj.feishu.cn/docs/doccnYUPssndhRB48xR1657ZEMe)中，时间关系并没有及时整理。
+- **U-mobilenet**：基于mobilenet-large进行改进，参考U-net的结构，在mobilenet中增加了U-net的设计，并将最低层的特征图（j=4）与mobilenet的输出进行concat，实验证明这是一种有效策略(concant部分为j=0 -> j=5; j=2 -> j=7 ; j=4 -> mobilenet的最后输出。)
+```
+#mobilenet上的改进
+ cfg = [
+                # k, exp, c,  se,     nl,  s,
+                [3, 16, 16,16, False, 'relu', large_stride[0]],   #8*80 //16*160
+                [3, 64, 16,24, False, 'relu', (large_stride[1], 1)], #8*80 //16*160 i=1
+                [3, 72, 24,24, False, 'relu', 1],
+                [5, 72, 24,40, True, 'relu', (large_stride[2], 1)], #
+                [5, 120, 40,40, True, 'relu', 1],
+                [5, 120, 40,40, True, 'relu', 1],
+                [3, 240, 40,80, False, 'hardswish', 1],
+                [3, 200, 80,80, False, 'hardswish', 1],
+                [3, 184, 80,80, True, 'hardswish', 1],     #增加了这一层的SEnet
+                [3, 184, 80,80, True, 'hardswish', 1],     #增加了这一层的SEnet
+                [3, 480, 80,112, True, 'hardswish', 1],
+                [3, 672, 112,112, True, 'hardswish', 1],
+                [5, 672, 112,160, True, 'hardswish', (large_stride[3], 1)],
+                [5, 960, 160,160, True, 'hardswish', 1],
+                [5, 960, 160,160, False, 'hardswish', 1],   #通过敏感度分析，发现这一SEnet并没有用
+            ]
+```
+```
+增加了U-net1结构放入mobilenet中,结构模仿mobilenet进行设计，配置文件如下
+cfg_u_net = [
+                # k,exp,i_c,o_c,se,  act,   s
+                [3, 120, 24, 40, True, 'relu', 1],                           #i = 0
+                [3, 200, 40, 80, True, 'relu', (large_stride[1], 1)],
+                [3, 480, 80, 112, True, 'hardswish', 1],                     #i = 2
+                [3, 672, 112, 160, True, 'hardswish', (large_stride[3], 1)], # i = 3
+                # up block
+                [3, 480, 160, 112, True, 'hardswish', 1],
+                [3, 200, 80*2,80, True, 'hardswish', 1],                      #i = 5 up1
+                [3, 120, 80,  40, True, 'relu', 1],
+                [3, 120, 56,24, True, 'relu', 1],                             #i = 7 up2(400,600)
+            ]
+```
+- **downsample**： **这是一种简洁但非常高效的策略**，不同于CRNN本身通过直接压缩到（1,80,640）的形式进行2D向1D的转化，downsample使用高维的卷积信息（高维卷积代码写在U-mobilenet上），在高维卷积的基础上使用池化，再通过降维卷积下降至序列模型需要的通道维度，实验证明，
+  - 高维卷积再降维的方式：80通道的序列模型可以达到512的通道的序列模型的精度
+  - 池化的使用:让降维卷积大大缩小了参数量（降维卷积只需1 * 1即可）。实验证明，池化比起直接使用3 * 3卷积的方式，并不会造成模型的精度明显下降
+> **down sample** 整体流程如下
+  > 1.  模型在u-mobilenet阶段，last_conv输出为4 * 320 * 640（W,H,C）
+  > 2. 通过最大池化（2,2）-> (2 * 160 * 640)
+  > 3. 通过最大池化（2,2）->(1 * 80 * 640)
+  > 4. 降维卷积  640-> 80
+  > 5. 将模型调整成(B * 1 * 80 * 80)->(B,80,80) (batch, width, channels)
 
-## 注意
-PaddleOCR同时支持动态图与静态图两种编程范式
-- 动态图版本：release/2.1（默认分支，开发分支为dygraph分支），需将paddle版本升级至2.0.0（[快速安装](./doc/doc_ch/installation.md)）
-- 静态图版本：develop分支
+  
+- **transformer序列模块**： 这里使用了transformer的encoder结构，参考[SRN](https://openaccess.thecvf.com/content_CVPR_2020/html/Yu_Towards_Accurate_Scene_Text_Recognition_With_Semantic_Reasoning_Networks_CVPR_2020_paper.html)我们增加了字符阅读顺序。并使用dim = 80。序列模型部分，我们只使用了2层transformer的encoder结构（事实上一层仅需要0.5M模型大小），实验证明，更多层的transformer可以取得更好的性能。
+> 这里的整体流程为： 
+> + transformer 2层: d_inner_hid=self.hidden_dims * 2 这里从4改成了2，降低参数量但并没有牺牲精度
+> + 升维linear   80->160
+```
+class EncoderWithTrans(nn.Layer):
+    def __init__(self, in_channels, hidden_size,num_layers = 2,patch = 80):
+        super(EncoderWithTrans, self).__init__()
+        self.out_channels = hidden_size *2 #2
+        self.custom_channel = hidden_size
+        self.transformer=TransformerPosEncoder(hidden_dims=self.custom_channel, num_encoder_tus=num_layers,width=patch)
+        self.up_linear = EncoderWithFC(self.custom_channel,self.out_channels,'up_encoder')
 
-**近期更新**
-- 2021.4.26 [FAQ](./doc/doc_ch/FAQ.md)新增5个高频问题，总数213个，每周一都会更新，欢迎大家持续关注。
-- PaddleOCR研发团队对最新发版内容技术深入解读，4月13日晚上19:00，[直播地址](https://live.bilibili.com/21689802)。
-- 2021.4.8 release 2.1版本，新增AAAI 2021论文[端到端识别算法PGNet](./doc/doc_ch/pgnet.md)开源，[多语言模型](./doc/doc_ch/multi_languages.md)支持种类增加到80+。
-- 2021.2.8 正式发布PaddleOCRv2.0(branch release/2.0)并设置为推荐用户使用的默认分支. 发布的详细内容，请参考: https://github.com/PaddlePaddle/PaddleOCR/releases/tag/v2.0.0
-- 2021.1.26,28,29 PaddleOCR官方研发团队带来技术深入解读三日直播课，1月26日、28日、29日晚上19:30，[直播地址](https://live.bilibili.com/21689802)
-- [More](./doc/doc_ch/update.md)
-
-
-
-## 特性
-
-- PPOCR系列高质量预训练模型，准确的识别效果
-    - 超轻量ppocr_mobile移动端系列：检测（3.0M）+方向分类器（1.4M）+ 识别（5.0M）= 9.4M
-    - 通用ppocr_server系列：检测（47.1M）+方向分类器（1.4M）+ 识别（94.9M）= 143.4M
-    - 支持中英文数字组合识别、竖排文本识别、长文本识别
-    - 支持80+多语言识别，详见[多语言模型](./doc/doc_ch/multi_languages.md)
-- 丰富易用的OCR相关工具组件
-    - 半自动数据标注工具PPOCRLabel：支持快速高效的数据标注
-    - 数据合成工具Style-Text：批量合成大量与目标场景类似的图像
-- 支持用户自定义训练，提供丰富的预测推理部署方案
-- 支持PIP快速安装使用
-- 可运行于Linux、Windows、MacOS等多种系统
-
-## 效果展示
-
-<div align="center">
-    <img src="doc/imgs_results/ch_ppocr_mobile_v2.0/test_add_91.jpg" width="800">
-    <img src="doc/imgs_results/ch_ppocr_mobile_v2.0/00018069.jpg" width="800">
-</div>
-
-上图是通用ppocr_server模型效果展示，更多效果图请见[效果展示页面](./doc/doc_ch/visualization.md)。
-
-<a name="欢迎加入PaddleOCR技术交流群"></a>
-## 欢迎加入PaddleOCR技术交流群
-- 微信扫描二维码加入官方交流群，获得更高效的问题答疑，与各行各业开发者充分交流，期待您的加入。
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/dygraph/doc/joinus.PNG"  width = "200" height = "200" />
-</div>
-
-## 快速体验
-- PC端：超轻量级中文OCR在线体验地址：https://www.paddlepaddle.org.cn/hub/scene/ocr
-
-- 移动端：[安装包DEMO下载地址](https://ai.baidu.com/easyedge/app/openSource?from=paddlelite)(基于EasyEdge和Paddle-Lite, 支持iOS和Android系统)，Android手机也可以直接扫描下面二维码安装体验。
+    def forward(self, x):
+        x = self.transformer(x)
+        x = self.up_linear(x)
+        return x
+```
+## 数据增强
+## 参数优化
+## 环境部署
+## 如何运行
 
 
-<div align="center">
-<img src="./doc/ocr-android-easyedge.png"  width = "200" height = "200" />
-</div>
 
-- 代码体验：从[快速安装](./doc/doc_ch/quickstart.md) 开始
-
-<a name="模型下载"></a>
-## PP-OCR 2.0系列模型列表（更新中）
-**说明** ：2.0版模型和[1.1版模型](https://github.com/PaddlePaddle/PaddleOCR/blob/develop/doc/doc_ch/models_list.md)的主要区别在于动态图训练vs.静态图训练，模型性能上无明显差距。
-| 模型简介     | 模型名称     |推荐场景          | 检测模型 | 方向分类器 | 识别模型 |
-| ------------ | --------------- | ----------------|---- | ---------- | -------- |
-| 中英文超轻量OCR模型（9.4M） | ch_ppocr_mobile_v2.0_xx |移动端&服务器端|[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_det_train.tar)|[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_train.tar) |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_rec_pre.tar)      |
-| 中英文通用OCR模型（143.4M）   |ch_ppocr_server_v2.0_xx|服务器端 |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_det_train.tar)    |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_train.tar)    |[推理模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_infer.tar) / [预训练模型](https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_server_v2.0_rec_pre.tar)  |  
-
-更多模型下载（包括多语言），可以参考[PP-OCR v2.0 系列模型下载](./doc/doc_ch/models_list.md)
-
-
-<a name="PP-OCR"></a>
-## PP-OCR Pipeline
-<div align="center">
-    <img src="./doc/ppocr_framework.png" width="800">
-</div>
-
-PP-OCR是一个实用的超轻量OCR系统。主要由DB文本检测[2]、检测框矫正和CRNN文本识别三部分组成[7]。该系统从骨干网络选择和调整、预测头部的设计、数据增强、学习率变换策略、正则化参数选择、预训练模型使用以及模型自动裁剪量化8个方面，采用19个有效策略，对各个模块的模型进行效果调优和瘦身，最终得到整体大小为3.5M的超轻量中英文OCR和2.8M的英文数字OCR。更多细节请参考PP-OCR技术方案 https://arxiv.org/abs/2009.09941 。其中FPGM裁剪器[8]和PACT量化[9]的实现可以参考[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)。
-
-<a name="效果展示"></a>
-## 效果展示 [more](./doc/doc_ch/visualization.md)
-- 中文模型
-<div align="center">
-    <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/test_add_91.jpg" width="800">
-    <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/00015504.jpg" width="800">
-    <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/00056221.jpg" width="800">
-    <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/rotate_00052204.jpg" width="800">
-</div>
-
-- 英文模型
-<div align="center">
-    <img src="./doc/imgs_results/ch_ppocr_mobile_v2.0/img_12.jpg" width="800">
-</div>
-
-- 其他语言模型
-<div align="center">
-    <img src="./doc/imgs_results/french_0.jpg" width="800">
-    <img src="./doc/imgs_results/korean.jpg" width="800">
-</div>
-
-
-<a name="许可证书"></a>
-## 许可证书
-本项目的发布受<a href="https://github.com/PaddlePaddle/PaddleOCR/blob/master/LICENSE">Apache 2.0 license</a>许可认证。
-
-<a name="贡献代码"></a>
-## 贡献代码
-我们非常欢迎你为PaddleOCR贡献代码，也十分感谢你的反馈。
-
-
-- 非常感谢 [Khanh Tran](https://github.com/xxxpsyduck) 和 [Karl Horky](https://github.com/karlhorky) 贡献修改英文文档
-- 非常感谢 [zhangxin](https://github.com/ZhangXinNan)([Blog](https://blog.csdn.net/sdlypyzq)) 贡献新的可视化方式、添加.gitignore、处理手动设置PYTHONPATH环境变量的问题
-- 非常感谢 [lyl120117](https://github.com/lyl120117) 贡献打印网络结构的代码
-- 非常感谢 [xiangyubo](https://github.com/xiangyubo) 贡献手写中文OCR数据集
-- 非常感谢 [authorfu](https://github.com/authorfu) 贡献Android和[xiadeye](https://github.com/xiadeye) 贡献IOS的demo代码
-- 非常感谢 [BeyondYourself](https://github.com/BeyondYourself) 给PaddleOCR提了很多非常棒的建议，并简化了PaddleOCR的部分代码风格。
-- 非常感谢 [tangmq](https://gitee.com/tangmq) 给PaddleOCR增加Docker化部署服务，支持快速发布可调用的Restful API服务。
-- 非常感谢 [lijinhan](https://github.com/lijinhan) 给PaddleOCR增加java SpringBoot 调用OCR Hubserving接口完成对OCR服务化部署的使用。
-- 非常感谢 [Mejans](https://github.com/Mejans) 给PaddleOCR增加新语言奥克西坦语Occitan的字典和语料。
-- 非常感谢 [Evezerest](https://github.com/Evezerest)， [ninetailskim](https://github.com/ninetailskim)， [edencfc](https://github.com/edencfc)， [BeyondYourself](https://github.com/BeyondYourself)， [1084667371](https://github.com/1084667371) 贡献了PPOCRLabel的完整代码。
