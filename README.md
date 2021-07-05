@@ -9,7 +9,8 @@
 
 ## 算法介绍
 所有的参数设计的实验均记录在[paddle文字识别参数对比实验](https://mbqx5nqmwj.feishu.cn/docs/doccnYUPssndhRB48xR1657ZEMe)中，时间关系并没有及时整理。
-- **U-mobilenet**：基于mobilenet-large进行改进，参考U-net的结构，在mobilenet中增加了U-net的设计，并将最低层的特征图（j=4）与mobilenet的输出进行concat，实验证明这是一种有效策略(concant部分为j=0 -> j=5; j=2 -> j=7 ; j=4 -> mobilenet的最后输出。)
+### 1. U-mobilenet：
+基于mobilenet-large进行改进，参考U-net的结构，在mobilenet中增加了U-net的设计，并将最低层的特征图（j=4）与mobilenet的输出进行concat，实验证明这是一种有效策略(concant部分为j=0 -> j=5; j=2 -> j=7 ; j=4 -> mobilenet的最后输出。)
 ```
 #mobilenet上的改进
  cfg = [
@@ -46,7 +47,8 @@ cfg_u_net = [
                 [3, 120, 56,24, True, 'relu', 1],                             #i = 7 up2(400,600)
             ]
 ```
-- **downsample**： **这是一种简洁但非常高效的策略**，不同于CRNN本身通过直接压缩到（1,80,640）的形式进行2D向1D的转化，downsample使用高维的卷积信息（高维卷积代码写在U-mobilenet上），在高维卷积的基础上使用池化，再通过降维卷积下降至序列模型需要的通道维度，实验证明，
+### 2. downsample： 
+**这是一种简洁但非常高效的策略**，不同于CRNN本身通过直接压缩到（1,80,640）的形式进行2D向1D的转化，downsample使用高维的卷积信息（高维卷积代码写在U-mobilenet上），在高维卷积的基础上使用池化，再通过降维卷积下降至序列模型需要的通道维度，实验证明，
   - 高维卷积再降维的方式：80通道的序列模型可以达到512的通道的序列模型的精度
   - 池化的使用:让降维卷积大大缩小了参数量（降维卷积只需1 * 1即可）。实验证明，池化比起直接使用3 * 3卷积的方式，并不会造成模型的精度明显下降
 > **down sample** 整体流程如下
@@ -57,7 +59,8 @@ cfg_u_net = [
   > 5. 将模型调整成(B * 1 * 80 * 80)->(B,80,80) (batch, width, channels)
 
   
-- **transformer序列模块**： 这里使用了transformer的encoder结构，参考[SRN](https://openaccess.thecvf.com/content_CVPR_2020/html/Yu_Towards_Accurate_Scene_Text_Recognition_With_Semantic_Reasoning_Networks_CVPR_2020_paper.html)我们增加了字符阅读顺序。并使用dim = 80。序列模型部分，我们只使用了2层transformer的encoder结构（事实上一层仅需要0.5M模型大小），实验证明，更多层的transformer可以取得更好的性能。
+### 3. transformer序列模块： 
+这里使用了transformer的encoder结构，参考[SRN](https://openaccess.thecvf.com/content_CVPR_2020/html/Yu_Towards_Accurate_Scene_Text_Recognition_With_Semantic_Reasoning_Networks_CVPR_2020_paper.html)我们增加了字符阅读顺序。并使用dim = 80。序列模型部分，我们只使用了2层transformer的encoder结构（事实上一层仅需要0.5M模型大小），实验证明，更多层的transformer可以取得更好的性能。
 > 这里的整体流程为： 
 > + transformer 2层: d_inner_hid=self.hidden_dims * 2 这里从4改成了2，降低参数量但并没有牺牲精度
 > + 升维linear   80->160
