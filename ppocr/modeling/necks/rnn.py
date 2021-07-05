@@ -82,43 +82,29 @@ class Im2Seq_downsample(nn.Layer):
             if_act=True,
             act='hardswish',
             name=conv_name)
-        if self.use_resnet == True:
-            self.conv2 = nn.Conv2D(
-                in_channels=in_channels,
-                out_channels=in_channels,
-                kernel_size=(2,1),
-                stride=(2,1))
-            self.conv3 = nn.Conv2D(
-                in_channels=in_channels,
-                out_channels=in_channels,
-                kernel_size=(2,1),
-                stride=(2,1))
-            self.layer_norm1 =nn.LayerNorm([in_channels,4,80])
-            self.act1=nn.GELU()
-            self.act2=nn.GELU()
         self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
         # self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
     def forward(self, x):
-        # print(x.shape)
+        '''
+        模型在u-mobilenet阶段，last_conv输出为4*320*640（W,H,C）
+        downsample阶段流程
+            1.通过最大池化（2,2）-> (2*160*640)
+            2.通过最大池化（2,2）->(1*80*640)
+            3.降维卷积  640-> 80
+            4.将模型调整成(B*1*80*80)->(B,80,80) (batch, width, channels)
+        '''
+        x = self.pool(x)
         B, C, H, W = x.shape
-        if self.use_resnet == True:
-            x = self.act1(self.layer_norm1(self.conv2(x)))
-            x = self.act2((self.conv3(x)))
-        else:
-            x = self.pool(x)
-            B, C, H, W = x.shape
-            if H != 1 :
-                pool2 = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
-                x = pool2(x)
-            H =1
-            x = self.conv1(x)
+        if H != 1 :
+            pool2 = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
+            x = pool2(x)
+        x = self.conv1(x)
 
         # C = 240
         # H = 1
         # W = 80
         # print(x.shape)
-        if self.use_resnet != True:
-            assert H == 1
+        assert H == 1
         conv_out = paddle.reshape(x=x, shape=[-1, self.out_channels, self.patch])
         # conv_out = conv_out.squeeze(axis=2)
         conv_out = conv_out.transpose([0, 2, 1])
@@ -232,6 +218,12 @@ class Im2Seq_SqueezePatch(nn.Layer):
         return conv_out, 80
 
 class TransformerPosEncoder(nn.Layer):
+    '''
+        序列阶段，这里使用了transformer的encoder结构，代码在transformer encoder的基础上加入了字符阅读顺序（与SRN论文一致）
+        由于downsample步骤的缘故，transformer encoder只需要80的通道大小即可获得512通道同样的性能
+        1、transformer encoder 2层（经过测试一层参数量0.1M ,模型保存大小约0.5M）
+        2、其余配置与SRN论文保持一致
+    '''
     def __init__(self,  max_text_length=35, num_heads=8,
                  num_encoder_tus=2, hidden_dims=96,width=80):
         super(TransformerPosEncoder, self).__init__()

@@ -99,6 +99,7 @@ class UMobileNetV3(nn.Layer):
                 [5, 960, 160,160, True, 'hardswish', 1],
                 [5, 960, 160,160, False, 'hardswish', 1],
             ]
+            # large-v2比之large的主要改进，最后一层去掉了senet，9,10层增加了SEnet，实验证明更加有效
             cfg_u_net = [
                 # k,exp,i_c,o_c,se,  act,   s
                 [3, 120, 24, 40, True, 'relu', 1],                   #i = 0
@@ -246,6 +247,7 @@ class UMobileNetV3(nn.Layer):
             if_act=True,
             act='hardswish',
             name='conv_last_2')
+        # 实验表明，最后一层的卷积，增加通道数，（640）可以让序列模型的transformer结构用80channel获得512channel的精度
         self.conv2 = ConvBNLayer(
             in_channels=inplanes*2,
             out_channels= self.out_channels, # make_divisible(scale * cls_ch_squeeze), #160 # inplanes*8,
@@ -269,12 +271,20 @@ class UMobileNetV3(nn.Layer):
         # self.pool = nn.MaxPool2D(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x):
-        # print(x.shape)
+        '''
+        U-mobilenet使用mobilenet-large作为pipline
+            1.对mobilenet的改进：设计了large-v2版本，经过实验更加有效，配置文件见上
+            2.对U-mobilenet的设计：在mobilenet通过两个卷积以后，进行了特征位置信息增强的模块，该模块基于U-net进行设计，我们称之为U-mobilenet
+            3.之后的模块结构和mobilenet保持一致
+            4.这一特征信息增强的U-net模块，最底下一层将与mobilenet的结果进行concat，以增强信息（j=4）
+        ps:最终提交版本代码不包含umv+mv部分，以及use_m_concat == True的情况
+        '''
         x = self.conv1(x)
         use_m_concat = False
         mv_out = None
         u1_concat,u2_concat,u3_concat = None,None,None
         m1_concat,m2_concat,m3_concat = None,None,None
+        # 经过实验，最终提交版本不包含umv+mv的情况
         if self.model_name == 'umv+mv':
             mv_out = self.mv_blocks(x)
             mv_out = self.conv2_2(mv_out)
@@ -285,6 +295,8 @@ class UMobileNetV3(nn.Layer):
             # print(i)
             if i==1:
                 # u-net pipline
+                # j = 0,2,4 concat for 5,7 8
+                # u-mobilenet经过实验，最终提交版本不包含use_m_concat的情况
                 for j,u in enumerate(self.ublocks):
                     if j == 0:
                         u1_concat = x
