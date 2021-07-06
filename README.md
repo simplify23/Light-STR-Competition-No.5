@@ -2,7 +2,7 @@
 
 ## 简介
 这里是[Paddle轻量级文字识别技术创新大赛](https://aistudio.baidu.com/aistudio/competition/detail/75)第11名的代码链接。
-- 我们的模型**总大小9.8M A榜精度80.78% B榜精度79%**
+- 我们的模型**总大小9.7M A榜精度80.78% B榜精度79%**
 - 模型整体pipline：U-mobilenet + downsample + transformer*2
 - 最终的提交代码训练细节为： 400轮训练lr0.001 + 150轮训练lr0.00001（去掉mix_up和cutout）
 - 模型:[训练模型](https://pan.baidu.com/s/1PgqwvWKTwrKF2icZZGtsSQ)提取码：rezn
