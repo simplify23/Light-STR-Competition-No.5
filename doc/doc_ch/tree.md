@@ -76,7 +76,7 @@
 ![image](https://user-images.githubusercontent.com/42465965/124563454-a1f8b080-de72-11eb-9768-e5b168af0320.png)
 - 效果如下图        
 ![image](https://user-images.githubusercontent.com/42465965/124558928-b1c1c600-de6d-11eb-8ef8-bb3ab48d15e1.png)
-
+- 代码链接：https://github.com/simplify23/Ultra_light_OCR_No.11/blob/5c0e5259dee28484f68122b9955f2469300b89eb/ppocr/data/imaug/cut_aug.py
 ### 2. mixup：将随机的两张样本按比例混合，计算loss按比例分配
 - 配置文件Global下，添加mix_up，后接概率(对每个batch以一定概率是否使用mix up)  
 - 代码链接：https://github.com/simplify23/Ultra_light_OCR_No.11/blob/5c0e5259dee28484f68122b9955f2469300b89eb/tools/program.py#L245
