@@ -1,0 +1,133 @@
+Global:
+  use_gpu: true
+  epoch_num: 400
+  log_smooth_window: 20
+  print_batch_step: 30
+  save_model_dir: ./output/rec/final_400_umv_trans_2_9.8M
+  save_epoch_step: 50
+  # evaluation is run every 5000 iterations after the 4000th iteration
+  eval_batch_step: [0, 2000]
+  cal_metric_during_train: True
+  pretrained_model:
+  checkpoints:
+  save_inference_dir:
+  use_visualdl: True
+  infer_img: doc/imgs_words/ch/word_1.jpg
+  # for data or label process
+  character_dict_path: ppocr/utils/ppocr_keys_v2.txt
+  character_type: ch
+  max_text_length: 35
+  infer_mode: False
+  use_space_char: True
+  save_res_path: ./output/rec/pp_ocr_ztl_baseline/ztl_500_none_bilstm_96_2_ctc.txt
+  count_model: False
+  mix_up: 0.4
+
+Optimizer:
+  name: Adam
+  beta1: 0.9
+  beta2: 0.999
+  lr:
+    name: Cosine
+    learning_rate: 0.001
+  regularizer:
+    name: 'L2'
+    factor: 0.00001
+
+Architecture:
+  model_type: rec
+  algorithm: CRNN
+  in_channels: 3
+  #  Transform:
+  #    name: TPS
+  #    num_fiducial: 12
+  #    loc_lr: 0.1
+  #    model_name: small
+  Backbone:
+    name: UMobileNetV3
+    scale: 0.5
+    model_name: large-v2
+  #  Backbone:
+  #    name: ResNet
+  #    layers: 18
+  #  Backbone:
+  #    name: MobileNetV3
+  #    scale: 0.5
+  #    model_name: small
+  #    small_stride: [1, 2, 2, 2]
+  Neck:
+    name: SequenceEncoder
+    encoder_type: transformer
+    hidden_size: 80
+    patch: 80
+    num_layers : 4
+    img2seq: cnn+mixer
+  Head:
+    name: CTCHead
+    fc_decay: 0.0004
+
+Loss:
+  name: CTCLoss
+
+PostProcess:
+  name: CTCLabelDecode
+
+Metric:
+  name: RecMetric
+  main_indicator: acc
+
+Train:
+  dataset:
+    name: SimpleDataSet
+    data_dir: ./train_data/
+    label_file_list: ["./dataset/train/labeltrain.txt"]
+    transforms:
+      - DecodeImage: # load image
+          img_mode: BGR
+          channel_first: False
+      - RecAug:
+          use_tia: True
+          use_cutout: True
+          aug_prob: 0.4
+      - CTCLabelEncode: # Class handling label
+      #      - SRNRecResizeImg:
+      #          image_shape: [3, 64, 640]
+      #          max_text_length: 35
+      #          num_heads: 8
+      #      - RecResizeImg:
+      #          image_shape: [3, 32, 320]
+      - SRNRecResizeImgEx:
+          image_shape: [ 3, 64, 640]
+      - KeepKeys:
+          keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
+  loader:
+    shuffle: True
+    batch_size_per_card: 38
+    drop_last: True
+    num_workers: 8
+
+Eval:
+  dataset:
+    name: SimpleDataSet
+    data_dir: ./train_data
+    label_file_list: ["./dataset/train/labelval.txt"]
+    transforms:
+      - DecodeImage: # load image
+          img_mode: BGR
+          channel_first: False
+      - CTCLabelEncode: # Class handling label
+      #      - SRNRecResizeImg:
+      #          image_shape: [3, 64, 640]
+      #          max_text_length: 35
+      #          num_heads: 8
+      #      - RecResizeImg:
+      #          image_shape: [3, 32, 320]
+      - SRNRecResizeImgEx:
+          image_shape: [3, 64, 640]
+      - KeepKeys:
+          keep_keys: ['image', 'label', 'length'] # dataloader will return list in this order
+  loader:
+    shuffle: False
+    drop_last: False
+    batch_size_per_card: 38
+    num_workers: 8
