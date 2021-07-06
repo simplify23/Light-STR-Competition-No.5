@@ -21,14 +21,14 @@
 ├── ppocr
 │   ├── data
 │   │   ├── imaug                                   #数据增强部分代码
-│   │   │   ├── cut_aug.py
-│   │   │   ├── east_process.py
+│   │   │   ├── cut_aug.py            #cutout数据增强
+│   │   │   ├── east_process.py
 │   │   │   ├── iaa_augment.py
 │   │   │   ├── __init__.py
 │   │   │   ├── label_ops.py
 │   │   │   ├── randaugment.py
 │   │   │   ├── random_crop_data.py
-│   │   │   ├── rec_img_aug.py
+│   │   │   ├── rec_img_aug.py            #添加srn resize数据增强      
 │   │   │   ├── sast_process.py
 │   │   │   └── text_image_aug
 │   │   │       ├── augment.py
@@ -56,11 +56,11 @@
 │   ├── export_model.py
 │   ├── infer
 .  .    .
-│   │   ├── predict_rec.py
-│   │   └── utility.py
+│   │   ├── predict_rec.py            #srn resize
+│   │   └── utility.py
 │   ├── infer_rec.py
-│   ├── program.py
-│   └── train.py
+│   ├── program.py            #添加mixup数据增强
+│   └── train.py
 ├── train_data
 │   └── ppdataset -> ../../dataset/ppdataset
 └── train.sh
