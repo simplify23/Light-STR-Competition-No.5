@@ -5,6 +5,7 @@
 - 我们的模型**总大小9.8M A榜精度80.78% B榜精度79%**
 - 模型整体pipline：U-mobilenet + downsample + transformer*2
 - 最终的提交代码训练细节为： 400轮训练lr0.001 + 150轮训练lr0.00001（去掉mix_up和cutout）
+- 模型:[训练模型](https://pan.baidu.com/s/1PgqwvWKTwrKF2icZZGtsSQ)提取码：rezn
 - 我们算法的最大特点：**仅仅从模型设计的角度思考了这一问题**，
 暂时没有使用模型压缩的策略（如剪枝，蒸馏，量化等，未来会考虑）
 
@@ -14,7 +15,10 @@
 - [环境部署](#环境部署)
 - [如何运行](#如何运行)
 - [训练策略](#训练策略)
-
+> [模型链接](https://pan.baidu.com/s/1PgqwvWKTwrKF2icZZGtsSQ) 提取码：rezn
+> + model_400为第一步训练的模型（提供动态图）
+> + model_400_150 为第二步训练的模型 （提供静态图+动态图）
+> + 最终提交为model_400_150的静态图模型
 
 ## 算法介绍
 所有的参数设计的实验均记录在[paddle文字识别参数对比实验](https://mbqx5nqmwj.feishu.cn/docs/doccnYUPssndhRB48xR1657ZEMe)中，时间关系并没有及时整理。
