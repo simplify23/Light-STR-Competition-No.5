@@ -28,6 +28,12 @@ def _show(img):
         cv2.waitKey(0)
 
 
+"""
+    随机cut某个区域
+    args:
+        target_area: 区域面积
+        aspect_ratio: 长宽比
+"""
 def _random_erasing(img, x, y, h, w, target_area, aspect_ratio):
     for attempt in range(100):
         hh = int(round(math.sqrt(target_area * aspect_ratio)))
@@ -39,6 +45,13 @@ def _random_erasing(img, x, y, h, w, target_area, aspect_ratio):
             return img
     return img
 
+"""
+    随机cut某个区域
+    args:
+        sl: cut面积下限
+        sh: cut面积上限
+        r1: 长宽比率
+"""
 class RandomErasing(object):
     def __init__(self, sl=0.02, sh=0.4, r1=0.3):
         self.sl = sl
@@ -53,6 +66,13 @@ class RandomErasing(object):
         _show(img)
         return img
 
+"""
+    线性cut
+    args:
+        scale: 遮挡线的尺寸
+        kl: 斜率下限
+        kh: 斜率上限
+"""
 class LineErasing(object):
     def __init__(self, scale=0.05, kl=-PI / 4, kh=PI / 4):
         self.kl = kl
@@ -76,6 +96,13 @@ class LineErasing(object):
         return img
 
 
+"""
+    按字符随机cut某个区域
+    args:
+        sl: cut面积下限
+        sh: cut面积上限
+        r1: 长宽比率
+"""
 class SingleErasing(object):
     def __init__(self, sl=0.1, sh=0.2, r1=1):
         self.sl = sl
@@ -107,6 +134,13 @@ class SingleErasing(object):
         return img
 
 
+"""
+    按字符左右cut
+    args:
+        sl: cut面积下限
+        sh: cut面积上限
+        prob：cut概率
+"""
 class CropErasing(object):
     def __init__(self, sl=0.2, sh=0.6, prob=0.5):
         self.sl = sl
