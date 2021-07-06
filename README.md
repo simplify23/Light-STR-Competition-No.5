@@ -127,7 +127,18 @@ docker build -t paddleocr:gpu .
 sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
 ```
 ## 如何运行
-
+## 训练策略
+### step1  
+> + lr 0.01
+> + 数据增强概率0.4，打开cutout
+> + 打开mixup
+> + 训练400 epoch,取best acc的模型
+### step2
+> + 取上一步的best acc模型，进行续训，配置如下
+> + lr 0.00001
+> + 数据增强概率0.4
+> + 关闭mixup和cutout
+> + 续训150epoch，取best acc模型
 ## License
 This project is released under <a href="https://github.com/simplify23/Ultra_light_OCR_No.11/blob/master/LICENSE">Apache 2.0 license</a>
 
