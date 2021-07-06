@@ -127,6 +127,50 @@ docker build -t paddleocr:gpu .
 sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
 ```
 ## 如何运行
+### step1 数据准备：请自行下载比赛数据集或参考https://github.com/simplify23/PaddleOCR/blob/release/2.1/doc/doc_ch/recognition.md  
+如果需要自定义，请一并修改配置文件
+- 训练集路径：
+```
+|-dataset
+  |-train
+    |- labeltrain.txt    #标签
+    |- Train_000000.jpg
+    |- Train_000001.jpg
+    |- ...
+```
+- 验证集路径：
+```
+|-dataset
+  |-val
+    |- labelval.txt
+    |- ...
+```
+- 测试集路径：
+```
+|-dataset
+  |-test
+    |- Test_000000.jpg
+    |- ...
+```
+
+### step2: 启动训练
+```
+cd Ultra_light_OCR_No.11
+python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '0,1'  tools/train.py -c configs/rec/ztl_config_exp/ztl_400_umv_trans_2_9.8M.yml
+```
+### step3: 启动续训
+```
+python3 -m paddle.distributed.launch --log_dir=./debug/ --gpus '0,1'  tools/train.py -c configs/rec/ztl_config_exp/ztl_400_umv_trans_2_9.8M_150.yml
+```
+### step4: 导出模型
+```
+python3 tools/export_model.py -c output/rec/final_400_umv_trans_2_9.8M_150/config.yml -o Global.pretrained_model=output/rec/final_400_umv_trans_2_9.8M_150/best_accuracy Global.save_inference_dir=./inference/rec/final_400_umv_trans_2_9.8M_150/best_accuracy
+```
+### step5：预测
+```
+python3 tools/infer/predict_rec.py --rec_algorithm=CRNN --image_dir="dataset/test" --max_text_length=35 --rec_model_dir=inference/rec/final_400_umv_trans_2_9.8M_150/best_accuracy --rec_char_dict_path=ppocr/utils/ppocr_keys_v2.txt --rec_save_path="inference/rec/final_400_umv_trans_2_9.8M_150/best_accuracy/predict_rec.txt" --use_srn_resize=True --rec_image_shape="3, 64, 640"
+```
+
 ## 训练策略
 ### step1  
 > + lr 0.01
