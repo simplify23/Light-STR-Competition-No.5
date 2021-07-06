@@ -118,6 +118,16 @@ def resize_norm_img_srn(img, image_shape):
 ## 参数调优与设置
 ### 1.max_text_length：从原先的25调整到35
 ### 2.输入图像的尺寸从原先3 x 32 x 320 调整到 3 x 64 x 640
-### 3.训练策略
-- 在增强概率为0.4、mixup概率为0.4且打开cutout下训练400epoch，得到预训练模型  
-- 在预训练模型基础上，关闭mixup和cutout续训150epoch
+## 训练策略
+### step1  
+> lr 0.01
+> 数据增强概率0.4，打开cutout
+> 打开mixup
+> 训练400 epoch,取best acc的模型
+### step2
+> 取上一步的best acc模型，进行续训，配置如下
+> lr 0.00001
+> 数据增强概率0.4
+> 关闭mixup和cutout
+> 续训150epoch，取best acc模型
+
