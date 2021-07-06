@@ -81,7 +81,30 @@ class EncoderWithTrans(nn.Layer):
 ## 数据增强
 > - 使用了mix up 数据增强策略
 > - 使用了Cut out 数据增强策略
+### 1. cutout：由于训练集中含有遮挡样本，所以我们cutout来增强我们的数据，对这部分样本可以起到较好的学习效果。我们采用了几种不同的策略进行cutout增强
+        - Random Erasing：传统的cutout策略，随机在图片中选个区域进行cut
+        - Single Char Erasing：先根据字符数量对image进行划分，然后在单个子区域进行cut
+        - Random：单个子区域随机
+        - Crop：单个子区域左右部分cut
+        - Line Erasing：模拟线形状遮挡
+- 在配置文件Train/dataset/transforms/RecAug下，添加use_cutout作为打开开关，后接bool  
+![image](https://user-images.githubusercontent.com/42465965/124563454-a1f8b080-de72-11eb-9768-e5b168af0320.png)
+- 效果如下图        
+![image](https://user-images.githubusercontent.com/42465965/124558928-b1c1c600-de6d-11eb-8ef8-bb3ab48d15e1.png)
+- 代码链接：https://github.com/simplify23/Ultra_light_OCR_No.11/blob/5c0e5259dee28484f68122b9955f2469300b89eb/ppocr/data/imaug/cut_aug.py
+### 2. mixup：将随机的两张样本按比例混合，计算loss按比例分配
+- 配置文件Global下，添加mix_up，后接概率(对每个batch以一定概率是否使用mix up)  
+- 代码链接：https://github.com/simplify23/Ultra_light_OCR_No.11/blob/5c0e5259dee28484f68122b9955f2469300b89eb/tools/program.py#L245
+- 参考论文：https://arxiv.org/abs/1903.04246
 
+### 3. srn resize：将输入图像按照长宽比例进行不同的resize，在统一padding到统一尺寸
+- 在配置文件Train/dataset/transforms下，添加SRNRecResizeImgEx字段，后接reszie尺寸，如[ 3, 64, 640 ]、[ 3, 32, 320]
+ ![image](https://user-images.githubusercontent.com/42465965/124562638-d7e96500-de71-11eb-8a6c-8d5172e64007.png)
+
+- 参考论文：https://arxiv.org/abs/2009.09941
+## 参数调优与设置
+- max_text_length：从原先的25调整到35
+- 输入图像的尺寸从原先3 x 32 x 320 调整到 3 x 64 x 640
 由于篇幅原因，我们将数据增强部分，参数优化设置，以及整体代码目录均放在下面文档中：
 - [模型的其他策略介绍](./doc/doc_ch/tree.md)
 
