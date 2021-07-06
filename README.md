@@ -1,3 +1,5 @@
+- [整体介绍](#简介)
+- [算法流程](#算法介绍)
 
 ## 简介
 这里是[Paddle轻量级文字识别技术创新大赛](https://aistudio.baidu.com/aistudio/competition/detail/75)第11名的代码链接。
