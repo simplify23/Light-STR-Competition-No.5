@@ -115,4 +115,6 @@ def resize_norm_img_srn(img, image_shape):
     return np.reshape(img_black, (c, row, col)).astype(np.float32)
 ```
 - 参考论文：https://arxiv.org/abs/2009.09941
-
+## 参数调优与设置
+### 1.max_text_length：从原先的25调整到35
+### 2.输入图像的尺寸从原先3 x 32 x 320 调整到 3 x 64 x 640
