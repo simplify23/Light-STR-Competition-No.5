@@ -20,15 +20,15 @@
 │       └── ztl_rec_mv3_none_bilstm_ctc.yml
 ├── ppocr
 │   ├── data
-│   │   ├── imaug                                   #数据增强部分代码
-│   │   │   ├── cut_aug.py            #cutout数据增强
+│   │   ├── imaug                                       #数据增强部分代码
+│   │   │   ├── cut_aug.py                              #cutout数据增强
 │   │   │   ├── east_process.py
 │   │   │   ├── iaa_augment.py
 │   │   │   ├── __init__.py
 │   │   │   ├── label_ops.py
 │   │   │   ├── randaugment.py
 │   │   │   ├── random_crop_data.py
-│   │   │   ├── rec_img_aug.py            #添加srn resize数据增强      
+│   │   │   ├── rec_img_aug.py                          #添加srn resize数据增强      
 │   │   │   ├── sast_process.py
 │   │   │   └── text_image_aug
 │   │   │       ├── augment.py
@@ -39,27 +39,27 @@
 │   │   │   ├── __init__.py
 │   │   │   ├── rec_mobilenet_v3.py
 │   │   │   ├── rec_resnet_fpn.py
-│   │   │   ├── rec_umobilenet_v3.py            #U-mobilenet的backbone代码位置
+│   │   │   ├── rec_umobilenet_v3.py                    #U-mobilenet的backbone代码位置
 │   │   ├── heads
 │   │   │   ├── rec_att_head.py
-│   │   │   ├── rec_ctc_head.py                 #最后使用的是CTC的结构
+│   │   │   ├── rec_ctc_head.py                         #最后使用的是CTC的结构
 │   │   │   └── self_attention.py
 │   │   ├── necks
 │   │   │   ├── __init__.py
-│   │   │   ├── rnn.py                         # downsample+transformer的代码位置
+│   │   │   ├── rnn.py                                  # downsample+transformer的代码位置
 │   └── utils
 │       ├── ppocr_keys_v1.txt
-│       ├── ppocr_keys_v2.txt                 #新设计了字典，适配训练集
+│       ├── ppocr_keys_v2.txt                           #新设计了字典，适配训练集
 │       └── utility.py
 ├── tools
 │   ├── eval.py
 │   ├── export_model.py
 │   ├── infer
 .  .    .
-│   │   ├── predict_rec.py            #srn resize
+│   │   ├── predict_rec.py                              #srn resize
 │   │   └── utility.py
 │   ├── infer_rec.py
-│   ├── program.py            #添加mixup数据增强
+│   ├── program.py                                      #添加mixup数据增强
 │   └── train.py
 ├── train_data
 │   └── ppdataset -> ../../dataset/ppdataset
