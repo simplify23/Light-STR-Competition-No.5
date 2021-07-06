@@ -215,6 +215,8 @@ def train(config,
     model.train()
 
     use_srn = config['Architecture']['algorithm'] == "SRN"
+    
+    #读取mixup概率
     if 'mix_up' in config['Global']:
         mix_up_prob = config['Global']['mix_up']
     else:
@@ -242,12 +244,13 @@ def train(config,
             lr = optimizer.get_lr()
             images = batch[0]
             use_mix_up = random.random() <= mix_up_prob
+            #开启mixup
             if use_mix_up:
                 batch_mixed = []
-                alpha = 0.5
+                alpha = 0.5 
                 batch_size = images.shape[0]
-                lam = np.random.beta(alpha, alpha)
-                index = np.random.permutation(np.arange(batch_size))
+                lam = np.random.beta(alpha, alpha) # 混淆比例满足Beta(0.5)分布
+                index = np.random.permutation(np.arange(batch_size)) # 随机两两混淆
                 images = images.numpy()
                 images = lam * images + (1 - lam) * images[index, :, :, :]
                 images = paddle.to_tensor(images)
@@ -266,8 +269,8 @@ def train(config,
 
             if use_mix_up:
                 loss1 = loss_class(preds, batch)
-                loss2 = loss_class(preds, batch_mixed)
-                loss = {'loss': lam * loss1['loss'] + (1-lam) * loss2['loss']}
+                loss2 = loss_class(preds, batch_mixed) 
+                loss = {'loss': lam * loss1['loss'] + (1-lam) * loss2['loss']} #loss 按照比例计算
             else:
                 loss = loss_class(preds, batch)
 
