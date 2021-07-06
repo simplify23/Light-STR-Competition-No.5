@@ -65,6 +65,11 @@ class RecResizeImg(object):
         data['image'] = norm_img
         return data
 
+"""
+    srn resize 增强
+    args:
+        image_shape: 将输入img以该尺寸输出
+"""
 class SRNRecResizeImgEx(object):
     def __init__(self,
                  image_shape,
@@ -146,6 +151,11 @@ def resize_norm_img_chinese(img, image_shape):
     padding_im[:, :, 0:resized_w] = resized_image
     return padding_im
 
+"""
+    按照输入img的长宽比，先进行resize到输出尺寸的不同长宽比，在统一padding到输出尺寸
+    args:
+        image_shape: 输出尺寸
+"""
 def resize_norm_img_ex(img, image_shape):
     imgC, imgH, imgW = image_shape
 
