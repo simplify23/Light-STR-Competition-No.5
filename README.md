@@ -127,7 +127,7 @@ docker build -t paddleocr:gpu .
 sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
 ```
 ## 如何运行
-### step1 数据准备：请自行下载比赛数据集或参考https://github.com/simplify23/PaddleOCR/blob/release/2.1/doc/doc_ch/recognition.md  
+### step1 数据准备：请自行下载比赛数据集或参考[训练文件](https://github.com/simplify23/PaddleOCR/blob/release/2.1/doc/doc_ch/recognition.md )
 如果需要自定义，请一并修改配置文件
 - 训练集路径：
 ```
@@ -139,6 +139,8 @@ sudo nvidia-docker run -dp 8868:8868 --name paddle_ocr paddleocr:gpu
     |- ...
 ```
 - 验证集路径：
+- **我们使用训练集的图片制作了验证集**，制作代码见```utils/process_label.py```
+- 验证集的标签我们放到```dataset/val/labelval.txt```
 ```
 |-dataset
   |-val
